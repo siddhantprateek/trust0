@@ -1,0 +1,8 @@
+export { default as NewCheckPage } from './new-check.page'
+export { default as NotFoundPage } from './notfound.page'
+export { default as OverviewPage } from './overview.page'
+export { default as ReportDetailPage } from './report-detail.page'
+export { default as ReportsPage } from './reports.page'
+export { default as SettingsPage } from './settings.page'
+export { default as SignInPage } from './sign-in.page'
+export { default as SignUpPage } from './sign-up.page'
