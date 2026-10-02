@@ -1,7 +1,7 @@
-import { UserButton } from '@clerk/react'
 import { FileSearch, LayoutDashboard, PlusCircle, Settings } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import Logo from '@/components/custom/logo/logo.component'
+import NavUser from '@/components/custom/nav-user/nav-user.component'
 import {
   Sidebar,
   SidebarContent,
@@ -44,7 +44,7 @@ export default function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link to="/">
-                <Logo />
+                <Logo mark />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -74,9 +74,7 @@ export default function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="flex items-center px-1 py-1.5 group-data-[collapsible=icon]:justify-center">
-          <UserButton showName />
-        </div>
+        <NavUser />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

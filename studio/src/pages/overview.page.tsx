@@ -45,6 +45,7 @@ export default function OverviewPage() {
     <div className="space-y-8">
       <PageHeading
         title={user?.firstName ? `Welcome back, ${user.firstName}` : 'Welcome back'}
+        titleClassName="font-pixel text-4xl leading-none font-normal tracking-normal"
         description="Here's what you've checked recently."
         actions={
           <Button asChild>
