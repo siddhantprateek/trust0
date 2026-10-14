@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import TrustScore from '@/components/custom/trust-score/trust-score.component'
 import VerdictBadge from '@/components/custom/verdict-badge/verdict-badge.component'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { formatDate, sourceLabels } from '@/lib/format'
+import { formatDate, sourceLabel } from '@/lib/format'
 import type { Report } from '@/lib/types'
 
 type ReportsTableProps = {
@@ -38,7 +38,7 @@ export default function ReportsTable({ reports }: ReportsTableProps) {
               <p className="font-medium">{report.title}</p>
               <p className="max-w-64 truncate font-mono text-xs text-muted-foreground">{report.url}</p>
             </TableCell>
-            <TableCell className="text-muted-foreground">{sourceLabels[report.source]}</TableCell>
+            <TableCell className="text-muted-foreground">{sourceLabel(report)}</TableCell>
             <TableCell>
               <VerdictBadge verdict={report.verdict} status={report.status} />
             </TableCell>

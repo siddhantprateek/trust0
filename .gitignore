@@ -35,5 +35,4 @@ Thumbs.db
 *.sw?
 
 # Tooling artifacts
-repomix-output.xml
 .claude/settings.local.json

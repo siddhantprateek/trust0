@@ -2,7 +2,6 @@ import { createBrowserRouter } from 'react-router-dom'
 import type { CrumbHandle } from '@/components/custom/site-header/site-header.component'
 import DashboardLayout from '@/layouts/dashboard.layout'
 import RootLayout from '@/layouts/root.layout'
-import { findReport } from '@/data/sample-reports'
 import {
   NewCheckPage,
   NotFoundPage,
@@ -36,7 +35,7 @@ export const router = createBrowserRouter([
               {
                 path: ':reportId',
                 element: <ReportDetailPage />,
-                handle: { crumb: (params) => findReport(params.reportId)?.title ?? 'Report' } satisfies CrumbHandle,
+                handle: { crumb: 'Report' } satisfies CrumbHandle,
               },
             ],
           },

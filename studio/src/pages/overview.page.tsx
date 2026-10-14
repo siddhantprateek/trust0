@@ -9,32 +9,43 @@ import StatCard from '@/components/custom/stat-card/stat-card.component'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { sampleReports } from '@/data/sample-reports'
+import { useReports } from '@/hooks/use-reports'
+import type { Report } from '@/lib/types'
 
-const complete = sampleReports.filter((report) => report.status === 'complete')
-const averageScore = Math.round(complete.reduce((sum, report) => sum + report.trustScore, 0) / complete.length)
-
-const stats = [
-  { label: 'Checks run', value: String(sampleReports.length), hint: 'All time', icon: FileSearch },
-  {
-    label: 'Likely AI-generated',
-    value: String(complete.filter((report) => report.verdict === 'likely-ai').length),
-    hint: `of ${complete.length} completed checks`,
-    icon: Bot,
-  },
-  {
-    label: 'Sources traced',
-    value: String(complete.reduce((sum, report) => sum + report.spread.length, 0)),
-    hint: 'Accounts and posts in spread paths',
-    icon: GitBranch,
-  },
-  { label: 'Average trust score', value: String(averageScore), hint: 'Across completed checks', icon: Gauge },
-]
+function buildStats(reports: Report[]) {
+  const complete = reports.filter((report) => report.status === 'complete')
+  const averageScore = complete.length
+    ? Math.round(complete.reduce((sum, report) => sum + report.trustScore, 0) / complete.length)
+    : 0
+  return [
+    { label: 'Checks run', value: String(reports.length), hint: 'All time', icon: FileSearch },
+    {
+      label: 'Likely AI-generated',
+      value: String(complete.filter((report) => report.verdict === 'likely-ai').length),
+      hint: `of ${complete.length} completed checks`,
+      icon: Bot,
+    },
+    {
+      label: 'Sources traced',
+      value: String(complete.reduce((sum, report) => sum + report.spread.length, 0)),
+      hint: 'Accounts and posts in spread paths',
+      icon: GitBranch,
+    },
+    {
+      label: 'Average trust score',
+      value: complete.length ? String(averageScore) : '—',
+      hint: 'Across completed checks',
+      icon: Gauge,
+    },
+  ]
+}
 
 export default function OverviewPage() {
   const { user } = useUser()
   const navigate = useNavigate()
   const [link, setLink] = useState('')
+  const { data: reports, error } = useReports()
+  const stats = buildStats(reports)
 
   const startCheck = (event: FormEvent) => {
     event.preventDefault()
@@ -54,9 +65,11 @@ export default function OverviewPage() {
         }
       />
 
-      <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-        Showing sample data. Connect the analysis API to see your real checks.
-      </p>
+      {error && (
+        <p className="rounded-md border border-dashed border-destructive/50 px-3 py-2 text-xs text-destructive">
+          {error}
+        </p>
+      )}
 
       <motion.div
         initial="hidden"
@@ -106,7 +119,7 @@ export default function OverviewPage() {
           </Button>
         </CardHeader>
         <CardContent>
-          <ReportsTable reports={sampleReports.slice(0, 4)} />
+          <ReportsTable reports={reports.slice(0, 4)} />
         </CardContent>
       </Card>
     </div>

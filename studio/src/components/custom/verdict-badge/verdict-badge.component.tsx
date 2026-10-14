@@ -7,6 +7,9 @@ const verdictStyles: Record<Verdict, string> = {
   'likely-ai': 'bg-destructive/10 text-destructive',
   edited: 'bg-chart-3/15 text-chart-3',
   authentic: 'bg-chart-1/15 text-chart-1',
+  accurate: 'bg-chart-1/15 text-chart-1',
+  mixed: 'bg-chart-3/15 text-chart-3',
+  inaccurate: 'bg-destructive/10 text-destructive',
   unverified: 'bg-muted text-muted-foreground',
 }
 

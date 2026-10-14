@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link2, Type, Upload } from 'lucide-react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import PageHeading from '@/components/custom/page-heading/page-heading.component'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { api } from '@/lib/api'
+import type { Report } from '@/lib/types'
 
 export default function NewCheckPage() {
   const [searchParams] = useSearchParams()
@@ -16,12 +18,32 @@ export default function NewCheckPage() {
   const [file, setFile] = useState<File | null>(null)
   const [text, setText] = useState('')
 
-  // No analysis backend yet: acknowledge the submission honestly instead of faking a result
-  const submit = (event: FormEvent) => {
+  const navigate = useNavigate()
+  const [submitting, setSubmitting] = useState(false)
+
+  const run = async (start: () => Promise<Report>) => {
+    setSubmitting(true)
+    try {
+      const report = await start()
+      navigate(`/reports/${report.id}`)
+    } catch (err) {
+      toast.error('Check failed to start', { description: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const submitLink = (event: FormEvent) => {
     event.preventDefault()
-    toast.info('Analysis API not connected yet', {
-      description: 'Your input is valid. Hook up the backend in new-check.page.tsx to run real checks.',
-    })
+    run(() => api.createReport({ kind: 'link', url: url.trim() }))
+  }
+  const submitFile = (event: FormEvent) => {
+    event.preventDefault()
+    if (file) run(() => api.uploadReport(file))
+  }
+  const submitText = (event: FormEvent) => {
+    event.preventDefault()
+    run(() => api.createReport({ kind: 'text', text: text.trim() }))
   }
 
   return (
@@ -48,7 +70,7 @@ export default function NewCheckPage() {
               <CardDescription>Instagram, X, YouTube, TikTok, Reddit or any article URL.</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={submit} className="space-y-4">
+              <form onSubmit={submitLink} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="url">URL</Label>
                   <Input
@@ -60,7 +82,9 @@ export default function NewCheckPage() {
                     onChange={(event) => setUrl(event.target.value)}
                   />
                 </div>
-                <Button type="submit">Run check</Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? 'Starting…' : 'Run check'}
+                </Button>
               </form>
             </CardContent>
           </Card>
@@ -73,7 +97,7 @@ export default function NewCheckPage() {
               <CardDescription>A photo or video file. We look for generation artifacts and edits.</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={submit} className="space-y-4">
+              <form onSubmit={submitFile} className="space-y-4">
                 <label
                   htmlFor="file"
                   className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-10 text-center transition-colors hover:bg-muted"
@@ -90,8 +114,8 @@ export default function NewCheckPage() {
                   className="sr-only"
                   onChange={(event) => setFile(event.target.files?.[0] ?? null)}
                 />
-                <Button type="submit" disabled={!file}>
-                  Run check
+                <Button type="submit" disabled={!file || submitting}>
+                  {submitting ? 'Uploading…' : 'Run check'}
                 </Button>
               </form>
             </CardContent>
@@ -105,7 +129,7 @@ export default function NewCheckPage() {
               <CardDescription>Paste an article, post or AI answer to check its claims.</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={submit} className="space-y-4">
+              <form onSubmit={submitText} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="text">Text</Label>
                   <Textarea
@@ -117,7 +141,9 @@ export default function NewCheckPage() {
                     onChange={(event) => setText(event.target.value)}
                   />
                 </div>
-                <Button type="submit">Run check</Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? 'Starting…' : 'Run check'}
+                </Button>
               </form>
             </CardContent>
           </Card>

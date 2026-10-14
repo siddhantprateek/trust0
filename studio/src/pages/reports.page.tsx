@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { sampleReports } from '@/data/sample-reports'
+import { useReports } from '@/hooks/use-reports'
 import type { Verdict } from '@/lib/types'
 
 type Filter = 'all' | Verdict
@@ -17,20 +17,22 @@ const filters: { value: Filter; label: string }[] = [
   { value: 'likely-ai', label: 'AI-generated' },
   { value: 'edited', label: 'Edited' },
   { value: 'authentic', label: 'Authentic' },
+  { value: 'unverified', label: 'Unverified' },
 ]
 
 export default function ReportsPage() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
+  const { data: all, error } = useReports()
 
   const reports = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return sampleReports.filter(
+    return all.filter(
       (report) =>
         (filter === 'all' || report.verdict === filter) &&
         (!q || report.title.toLowerCase().includes(q) || report.url.toLowerCase().includes(q)),
     )
-  }, [query, filter])
+  }, [all, query, filter])
 
   return (
     <div className="space-y-8">
@@ -43,6 +45,8 @@ export default function ReportsPage() {
           </Button>
         }
       />
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Tabs value={filter} onValueChange={(value) => setFilter(value as Filter)}>
