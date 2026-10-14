@@ -9,6 +9,8 @@ Chrome extension (Manifest V3) that tags what you read with a trust verdict and 
 
 Click a finished chip to see the summary and individual checks. The popup checks the current page, lists recent checks and holds the settings.
 
+Automatic chips (everything above except the right-click menu) only appear on websites in the **active sites** list, managed from the studio's Settings page (`${STUDIO_URL}/settings`, linked from the popup). A right-click check always works on any page, regardless of that list.
+
 Plain JavaScript, no build step.
 
 ## Load it

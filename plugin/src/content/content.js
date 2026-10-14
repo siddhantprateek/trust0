@@ -1,6 +1,6 @@
 // Tags AI answers, posts, messages and media on the page with a trust0 chip that shows the verdict and score.
 ;(() => {
-  const { verdictInfo, TONES, getSettings, DEFAULT_SETTINGS } = globalThis.trust0
+  const { verdictInfo, TONES, getSettings, DEFAULT_SETTINGS, hostMatchesSite } = globalThis.trust0
   const site = globalThis.trust0Site
   const STREAM_SETTLE_MS = 1500
   const SCAN_DEBOUNCE_MS = 300
@@ -398,13 +398,17 @@
     )
   }
 
+  // Whether this site is in the "active sites" list (studio Settings). Automatic chips are gated on it; a
+  // check started from the right-click menu (the listener just below) always works, site list or not.
+  let activeHere = false
+
   let scanTimer = 0
   let observer = null
   function scheduleScan() {
     clearTimeout(scanTimer)
     scanTimer = setTimeout(() => {
       if (!contextAlive()) return observer?.disconnect()
-      if (!settings.showChips) return
+      if (!activeHere || !settings.showChips) return
       scanElements()
       scanPage()
     }, SCAN_DEBOUNCE_MS)
@@ -425,8 +429,9 @@
     scheduleScan()
   })
 
-  getSettings().then((loaded) => {
+  Promise.all([getSettings(), chrome.runtime.sendMessage({ type: 'active-sites' }).catch(() => ({ domains: [] }))]).then(([loaded, { domains }]) => {
     settings = loaded
+    activeHere = hostMatchesSite(location.hostname, domains)
     observer = new MutationObserver(scheduleScan)
     observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true })
     scheduleScan()

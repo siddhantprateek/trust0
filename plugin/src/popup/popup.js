@@ -1,4 +1,4 @@
-const { verdictInfo, TONES, getSettings } = globalThis.trust0
+const { verdictInfo, TONES, getSettings, STUDIO_URL } = globalThis.trust0
 
 const $ = (id) => document.getElementById(id)
 
@@ -116,6 +116,7 @@ async function refreshStatus() {
 
 async function setupSettings() {
   const form = $('settings')
+  $('active-sites-link').href = `${STUDIO_URL}/settings`
   const settings = await getSettings()
   form.autoCheckAi.checked = settings.autoCheckAi
   form.showChips.checked = settings.showChips

@@ -1,6 +1,7 @@
 importScripts('shared.js')
 
-const { VERDICTS, API_BASE } = globalThis.trust0
+const { VERDICTS, API_BASE, DEFAULT_ACTIVE_SITES } = globalThis.trust0
+const ACTIVE_SITES_TTL_MS = 10 * 60 * 1000
 const HISTORY_LIMIT = 50
 const MAX_TEXT = 8000
 const POLL_INTERVAL_MS = 3000
@@ -52,6 +53,23 @@ async function loadFont() {
   return fontData
 }
 
+// Websites the extension scans automatically (set from the studio's Settings page). Cached in storage.local so
+// every content script doesn't hit the API on every page load; falls back to the last cache, then the bundled
+// defaults, if the API can't be reached — a check-request from the right-click menu always works regardless.
+async function activeSites() {
+  const { activeSitesCache: cached } = await chrome.storage.local.get('activeSitesCache')
+  if (cached && Date.now() - cached.at < ACTIVE_SITES_TTL_MS) return cached.domains
+  try {
+    const response = await fetch(`${API_BASE}/v1/extension/active-sites`, { signal: AbortSignal.timeout(5000) })
+    if (!response.ok) throw new Error(`active-sites responded ${response.status}`)
+    const domains = (await response.json()).map((s) => s.domain)
+    await chrome.storage.local.set({ activeSitesCache: { domains, at: Date.now() } })
+    return domains
+  } catch {
+    return cached?.domains ?? DEFAULT_ACTIVE_SITES
+  }
+}
+
 async function apiStatus() {
   try {
     const response = await fetch(`${API_BASE}/v1/health`, { signal: AbortSignal.timeout(4000) })
@@ -61,7 +79,7 @@ async function apiStatus() {
   }
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'font') {
     loadFont()
       .then((data) => sendResponse({ ok: true, data }))
@@ -72,14 +90,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     apiStatus().then(sendResponse)
     return true
   }
+  if (message?.type === 'active-sites') {
+    activeSites().then((domains) => sendResponse({ domains }))
+    return true
+  }
   if (message?.type !== 'check') return
-  runCheck(message.request)
+  // The tab the check was run from (not necessarily request.url, e.g. a right-click "check this link" to
+  // elsewhere): that tab's site is what should start getting chips automatically from now on
+  runCheck(message.request, sender.tab?.url)
     .then((result) => sendResponse({ ok: true, result }))
     .catch((error) => sendResponse({ ok: false, error: error.message }))
   return true // keep the channel open for the async response
 })
 
-async function runCheck(rawRequest) {
+async function runCheck(rawRequest, tabUrl) {
   const request = { ...rawRequest, text: rawRequest.text?.slice(0, MAX_TEXT) }
   const key = hash(JSON.stringify([request.kind, request.url, request.mediaUrl, request.text]))
   if (cache.has(key)) return cache.get(key)
@@ -88,7 +112,38 @@ async function runCheck(rawRequest) {
   // A check still running on the server is asked again next time, so the chip can pick up the finished result
   if (result.status === 'complete') cache.set(key, result)
   await addToHistory(request, result)
+  // Reaching trust0's API means the user cared enough to check something here; the popup's "Check this page"
+  // has no sender tab, so fall back to the checked URL itself (that case is always a same-site page check)
+  ensureSiteActive(tabUrl ?? request.url).catch(() => {})
   return result
+}
+
+// Adds the site to the "active sites" list (studio Settings) so it gets automatic chips from now on. Best-effort:
+// a failure here never breaks the check itself, and the backend POST is idempotent, so retrying is always safe.
+async function ensureSiteActive(pageUrl) {
+  let host
+  try {
+    host = new URL(pageUrl).hostname.replace(/^www\./, '')
+  } catch {
+    return
+  }
+  if (!host) return
+
+  const { activeSitesCache: cached } = await chrome.storage.local.get('activeSitesCache')
+  if (cached?.domains.some((d) => host === d || host.endsWith(`.${d}`))) return // already active
+
+  const response = await fetch(`${API_BASE}/v1/extension/active-sites`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ domain: host }),
+    signal: AbortSignal.timeout(8000),
+  })
+  if (!response.ok) return
+  const site = await response.json()
+  const domains = cached?.domains ?? []
+  if (!domains.includes(site.domain)) {
+    await chrome.storage.local.set({ activeSitesCache: { domains: [...domains, site.domain], at: cached?.at ?? Date.now() } })
+  }
 }
 
 async function callApi(request) {
