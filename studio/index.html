@@ -7,6 +7,18 @@
     <title>trust0 Studio</title>
   </head>
   <body>
+    <!-- Applies the saved/system theme before paint, so next-themes doesn't flash the wrong one on load -->
+    <script>
+      ;(() => {
+        try {
+          const stored = localStorage.getItem('theme')
+          const dark = stored === 'dark' || (stored !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.classList.toggle('dark', dark)
+        } catch {
+          // localStorage can throw in locked-down contexts; fall back to the light theme
+        }
+      })()
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

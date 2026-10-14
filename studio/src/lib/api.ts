@@ -1,4 +1,4 @@
-import type { CheckInput, LinkMeta, Preview, Report } from '@/lib/types'
+import type { ActiveSite, CheckInput, LinkMeta, Preview, Report } from '@/lib/types'
 
 const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '')
 
@@ -19,6 +19,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new Error(detail || `API error ${response.status}`)
   }
+  if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
 
@@ -45,6 +46,7 @@ function normalize(report: Report): Report {
     spread: report.spread ?? [],
     claims: report.claims ?? [],
     sections: report.sections ?? [],
+    coverage: report.coverage ?? null,
     preview,
   }
 }
@@ -59,6 +61,15 @@ export const api = {
       body: JSON.stringify(input),
     }),
   linkPreview: (url: string) => request<LinkMeta>(`/v1/link-preview?url=${encodeURIComponent(url)}`),
+  listActiveSites: () => request<ActiveSite[]>('/v1/extension/active-sites'),
+  addActiveSite: (domain: string) =>
+    request<ActiveSite>('/v1/extension/active-sites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain }),
+    }),
+  removeActiveSite: (domain: string) =>
+    request<void>(`/v1/extension/active-sites/${encodeURIComponent(domain)}`, { method: 'DELETE' }),
   uploadReport: (file: File) => {
     const body = new FormData()
     body.append('file', file)

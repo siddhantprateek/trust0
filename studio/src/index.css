@@ -8,6 +8,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Belt-and-braces for the appearance.elements overrides in clerk-appearance.ts: strips Clerk's own box-shadow
+   from every element it renders (cards, nav, popovers, …), in case a surface isn't covered by name there. */
+@layer components {
+  [class^="cl-"],
+  [class*=" cl-"] {
+    box-shadow: none !important;
+  }
+}
+
 :root {
   --background: rgb(253, 253, 253);
   --foreground: rgb(0, 0, 0);
@@ -45,6 +54,10 @@
   --font-pixel: "Geist Pixel", ui-monospace, monospace;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius: 0.625rem;
+  /* Left / Center / Right coverage colors, as on Ground News */
+  --lean-left: rgb(37, 99, 235);
+  --lean-center: rgb(163, 163, 175);
+  --lean-right: rgb(220, 38, 38);
   --shadow-x: 0px;
   --shadow-y: 2px;
   --shadow-blur: 3px;
@@ -64,6 +77,9 @@
 }
 
 .dark {
+  --lean-left: rgb(96, 145, 255);
+  --lean-center: rgb(140, 140, 150);
+  --lean-right: rgb(248, 96, 96);
   --background: rgb(26, 27, 30);
   --foreground: rgb(240, 240, 240);
   --card: rgb(34, 35, 39);
@@ -99,6 +115,9 @@
 }
 
 @theme inline {
+  --color-lean-left: var(--lean-left);
+  --color-lean-center: var(--lean-center);
+  --color-lean-right: var(--lean-right);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -173,5 +192,35 @@
   body {
     @apply bg-background leading-tight text-foreground antialiased;
     letter-spacing: var(--tracking-normal);
+  }
+
+  /* Thin scrollbar with a transparent track, tinted to the current theme (Firefox) */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  :root {
+    --scrollbar-thumb: color-mix(in srgb, var(--foreground) 20%, transparent);
+  }
+
+  /* Chromium/WebKit: same thin, transparent-track scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+    background-color: var(--scrollbar-thumb);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--foreground) 32%, transparent);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }

@@ -1,6 +1,8 @@
 import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, FileText, ImageIcon } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import ContentPreview from '@/components/custom/content-preview/content-preview.component'
+import CoverageCard from '@/components/custom/coverage-card/coverage-card.component'
+import LeanBadge from '@/components/custom/lean-badge/lean-badge.component'
 import LinkCard from '@/components/custom/link-card/link-card.component'
 import PageHeading from '@/components/custom/page-heading/page-heading.component'
 import VerdictBadge from '@/components/custom/verdict-badge/verdict-badge.component'
@@ -11,9 +13,9 @@ import { LinkHoverPreview } from '@/components/ui/link-hover-preview'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useReport } from '@/hooks/use-reports'
-import { formatDate, sourceLabel } from '@/lib/format'
+import { formatDate, leanSide, sourceLabel } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import type { SpreadStep } from '@/lib/types'
+import type { ClaimSource, SpreadStep } from '@/lib/types'
 
 const claimStyles = {
   supported: 'bg-chart-1/15 text-chart-1',
@@ -197,24 +199,29 @@ export default function ReportDetailPage() {
                         <Badge className={cn('shrink-0', claimStyles[claim.verdict])}>{claim.verdict}</Badge>
                       </div>
                       <p className="text-muted-foreground">{claim.explanation}</p>
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                         {claim.sources.map((source) => (
-                          <LinkHoverPreview
-                            key={source.url}
-                            url={source.url}
-                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                          >
-                            {source.publisher ?? source.title ?? new URL(source.url).hostname}
-                            <ExternalLink className="size-3" />
-                          </LinkHoverPreview>
+                          <span key={source.url} className="inline-flex items-center gap-1.5">
+                            <LinkHoverPreview
+                              url={source.url}
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              {source.publisher ?? source.title ?? new URL(source.url).hostname}
+                              <ExternalLink className="size-3" />
+                            </LinkHoverPreview>
+                            {source.lean && <LeanBadge lean={source.lean} />}
+                          </span>
                         ))}
                       </div>
+                      <SourceSpread sources={claim.sources} />
                     </li>
                   ))}
                 </ul>
               </CardContent>
             </Card>
           )}
+
+          {report.coverage && <CoverageCard coverage={report.coverage} />}
 
           <Card className="lg:col-span-3">
             <CardHeader>
@@ -268,5 +275,19 @@ export default function ReportDetailPage() {
         </Link>
       </Button>
     </div>
+  )
+}
+
+/** Which sides of the spectrum the sources behind a claim come from: a claim confirmed across sides is sturdier. */
+function SourceSpread({ sources }: { sources: ClaimSource[] }) {
+  const sides = (['left', 'center', 'right'] as const).filter((side) => sources.some((s) => leanSide(s.lean) === side))
+  if (sides.length === 0) return null
+  const names = { left: 'Left', center: 'Center', right: 'Right' }
+  return (
+    <p className="text-xs text-muted-foreground">
+      {sides.length === 3
+        ? 'Sources span Left, Center and Right outlets.'
+        : `Sources come from ${sides.map((side) => names[side]).join(' and ')} outlets${sides.length === 1 ? ' only' : ''}.`}
+    </p>
   )
 }

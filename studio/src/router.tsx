@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import type { CrumbHandle } from '@/components/custom/site-header/site-header.component'
 import DashboardLayout from '@/layouts/dashboard.layout'
 import RootLayout from '@/layouts/root.layout'
@@ -8,7 +8,8 @@ import {
   OverviewPage,
   ReportDetailPage,
   ReportsPage,
-  SettingsPage,
+  SettingsAccountPage,
+  SettingsAllowListPage,
   SignInPage,
   SignUpPage,
 } from '@/pages'
@@ -39,7 +40,16 @@ export const router = createBrowserRouter([
               },
             ],
           },
-          { path: 'settings/*', element: <SettingsPage />, handle: { crumb: 'Settings' } satisfies CrumbHandle },
+          {
+            path: 'settings',
+            handle: { crumb: 'Settings' } satisfies CrumbHandle,
+            children: [
+              { index: true, element: <Navigate to="allow-list" replace /> },
+              { path: 'allow-list', element: <SettingsAllowListPage />, handle: { crumb: 'Allow list' } satisfies CrumbHandle },
+              // Clerk needs the full subtree (security tab, verification steps, …)
+              { path: 'account/*', element: <SettingsAccountPage />, handle: { crumb: 'Account' } satisfies CrumbHandle },
+            ],
+          },
           { path: '*', element: <NotFoundPage /> },
         ],
       },

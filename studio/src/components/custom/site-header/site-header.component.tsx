@@ -1,5 +1,6 @@
 import { Fragment } from 'react'
 import { Link, useMatches, type Params } from 'react-router-dom'
+import ThemeToggle from '@/components/custom/theme-toggle/theme-toggle.component'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -50,6 +51,7 @@ export default function SiteHeader() {
           ))}
         </BreadcrumbList>
       </Breadcrumb>
+      <ThemeToggle className="ml-auto" />
     </header>
   )
 }

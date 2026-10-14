@@ -31,10 +31,40 @@ export type ReportCheck = {
   label: string
 }
 
+// Political lean of a news outlet (never of a fact)
+export type Lean = 'left' | 'lean-left' | 'center' | 'lean-right' | 'right'
+
 export type ClaimSource = {
   url: string
   title?: string | null
   publisher?: string | null
+  lean?: Lean | null
+}
+
+export type CoverageSource = {
+  outlet: string
+  domain: string
+  url: string
+  title: string | null
+  publishedAt: string | null
+  lean: Lean | null
+  // 'table': curated rating; 'estimated': the model's estimate for an outlet missing from the table
+  rating: 'table' | 'estimated' | null
+}
+
+export type Coverage = {
+  query: string
+  sources: CoverageSource[]
+  left: number
+  center: number
+  right: number
+  unrated: number
+  leftPct: number
+  centerPct: number
+  rightPct: number
+  blindspot: 'left' | 'right' | null
+  subjectOutlet: string | null
+  subjectLean: Lean | null
 }
 
 export type Claim = {
@@ -95,6 +125,7 @@ export type Report = {
   claims: Claim[]
   signals: Signals
   sections: ReportSection[]
+  coverage: Coverage | null
   preview: Preview | null
   error: string | null
 }
@@ -108,4 +139,10 @@ export type LinkMeta = {
   image: string | null
   siteName: string
   kind: 'page' | 'image'
+}
+
+// A website the browser extension runs on automatically; managed from Settings
+export type ActiveSite = {
+  domain: string
+  addedAt: string
 }
