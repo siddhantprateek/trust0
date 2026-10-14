@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trust0-api"
+version = "0.1.0"
+description = "trust0 analysis API: traces where content came from, checks its claims and flags AI-generated media."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic-settings>=2.4",
+  "sqlalchemy[asyncio]>=2.0",
+  "aiosqlite>=0.20",
+  "httpx>=0.27",
+  "anthropic>=1.11",
+  "openai>=1.60",
+  "yt-dlp>=2025.1.1",
+  "trafilatura>=2.0",
+  "pillow>=11.0",
+  "imagehash>=4.3",
+  "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.24"]
+# t0-vision and Whisper on this machine. Install torch from the CUDA index first for GPU support (see README)
+local = ["torch>=2.9", "transformers>=5.0", "accelerate>=1.0", "numpy>=2.0"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
