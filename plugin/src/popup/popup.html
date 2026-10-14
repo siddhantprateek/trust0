@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>trust0</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <img src="../../icons/icon-48.png" alt="" width="24" height="24" />
+      <strong>trust0</strong>
+      <span id="mode" class="pill"></span>
+    </header>
+
+    <section>
+      <h2>This page</h2>
+      <p id="page-title" class="muted truncate"></p>
+      <button id="check-page" class="primary">Check this page</button>
+      <div id="page-result"></div>
+    </section>
+
+    <section>
+      <h2>Recent checks</h2>
+      <ul id="history"></ul>
+      <p id="history-empty" class="muted">Nothing checked yet. Look for the trust0 chip on posts and AI answers, or right-click any text, link or image.</p>
+    </section>
+
+    <details>
+      <summary>Settings</summary>
+      <form id="settings">
+        <label class="row"><input name="autoCheckAi" type="checkbox" /> Auto-check AI answers when they finish</label>
+        <label class="row"><input name="showChips" type="checkbox" /> Show chips on posts, videos and articles</label>
+        <button type="submit">Save</button>
+        <span id="saved" class="muted" hidden>Saved</span>
+      </form>
+    </details>
+
+    <script src="../shared.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
