@@ -7,10 +7,10 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 
 from app.config import get_settings
-from app.db import find_recent_report, list_reports, load_report, save_report
+from app.db import add_active_site, find_recent_report, list_active_sites, list_reports, load_report, remove_active_site, save_report
 from app.pipeline import linkpreview, runner
-from app.pipeline.platforms import canonical_url, content_key, detect_platform, is_image_url
-from app.schemas import CheckRequest, CheckResponse, Report
+from app.pipeline.platforms import canonical_url, content_key, detect_platform, is_image_url, normalize_domain
+from app.schemas import ActiveSite, AddActiveSite, CheckRequest, CheckResponse, Report
 
 router = APIRouter(prefix="/v1")
 
@@ -120,6 +120,28 @@ async def get_link_preview(url: str) -> linkpreview.LinkPreview:
         return await linkpreview.preview(url)
     except linkpreview.BlockedHost as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+
+
+# --- Active sites (extension) ---------------------------------------------------------------------
+
+
+@router.get("/extension/active-sites", response_model=list[ActiveSite], tags=["extension"])
+async def get_active_sites() -> list:
+    """Websites the extension runs on automatically. Managed from the studio's Settings page."""
+    return await list_active_sites()
+
+
+@router.post("/extension/active-sites", response_model=ActiveSite, status_code=status.HTTP_201_CREATED, tags=["extension"])
+async def create_active_site(body: AddActiveSite) -> object:
+    domain = normalize_domain(body.domain)
+    if not domain:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Enter a website like example.com.")
+    return await add_active_site(domain)
+
+
+@router.delete("/extension/active-sites/{domain}", status_code=status.HTTP_204_NO_CONTENT, tags=["extension"])
+async def delete_active_site(domain: str) -> None:
+    await remove_active_site(domain.lower().removeprefix("www."))
 
 
 # --- Helpers -------------------------------------------------------------------------------------

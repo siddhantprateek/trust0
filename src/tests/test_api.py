@@ -93,6 +93,30 @@ def test_pasted_image_link_is_checked_as_an_image(client):
     assert calls[-1].url is None
 
 
+def test_active_sites_are_seeded_and_editable(client):
+    seeded = client.get("/v1/extension/active-sites").json()
+    assert {"x.com", "reddit.com", "chatgpt.com"} <= {s["domain"] for s in seeded}
+
+    created = client.post("/v1/extension/active-sites", json={"domain": "https://www.Example.com/path"})
+    assert created.status_code == 201
+    assert created.json()["domain"] == "example.com"
+
+    after_add = {s["domain"] for s in client.get("/v1/extension/active-sites").json()}
+    assert "example.com" in after_add
+
+    # Re-adding is idempotent
+    assert client.post("/v1/extension/active-sites", json={"domain": "example.com"}).status_code == 201
+
+    assert client.delete("/v1/extension/active-sites/example.com").status_code == 204
+    after_delete = {s["domain"] for s in client.get("/v1/extension/active-sites").json()}
+    assert "example.com" not in after_delete
+    assert client.delete("/v1/extension/active-sites/example.com").status_code == 204  # deleting twice is fine
+
+
+def test_active_site_rejects_garbage(client):
+    assert client.post("/v1/extension/active-sites", json={"domain": "not a domain"}).status_code == 422
+
+
 def test_rejects_empty_request(client):
     assert client.post("/v1/checks", json={"kind": "link"}).status_code == 422
 

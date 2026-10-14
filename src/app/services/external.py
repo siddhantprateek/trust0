@@ -49,6 +49,37 @@ async def _lens(image_url: str, kind: str, key: str, client: httpx.AsyncClient) 
     ]
 
 
+async def search_news(query: str, client: httpx.AsyncClient) -> list[dict]:
+    """Google News results for a story via SerpAPI: who else is covering it. One billed search per call."""
+    key = get_settings().serpapi_api_key
+    if not key or not query.strip():
+        return []
+    try:
+        response = await client.get(
+            "https://serpapi.com/search.json",
+            params={"engine": "google_news", "q": query[:200], "hl": "en", "api_key": key},
+            timeout=30,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        log.warning("News search failed: %s", exc.__class__.__name__)
+        return []
+    articles = []
+    for result in response.json().get("news_results", []):
+        # Google groups some stories: a headline plus related articles from other outlets
+        for entry in [result, result.get("highlight"), *(result.get("stories") or [])]:
+            if entry and entry.get("link"):
+                articles.append(
+                    {
+                        "url": entry["link"],
+                        "title": entry.get("title"),
+                        "outlet": (entry.get("source") or {}).get("name"),
+                        "date": entry.get("iso_date") or entry.get("date"),
+                    }
+                )
+    return articles
+
+
 async def search_fact_checks(query: str, client: httpx.AsyncClient) -> list[dict]:
     """Published fact checks (ClaimReview) that match a claim, from Google's Fact Check Tools API."""
     key = get_settings().google_factcheck_api_key

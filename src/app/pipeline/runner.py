@@ -11,7 +11,7 @@ import httpx
 
 from app.config import get_settings
 from app.db import load_report, save_report
-from app.pipeline import factcheck, ingest, media, provenance, scoring
+from app.pipeline import coverage, factcheck, ingest, media, provenance, scoring
 from app.schemas import Preview, ReportSection, Signals
 from app.services import external, local_models
 
@@ -85,11 +85,13 @@ async def _run(job: Job) -> None:
         ai_probability = sum(detectors.values()) / len(detectors) if detectors else None
 
         facts = await factcheck.check(item, trace, client)
+        # Needs the fact check's news query and sources; also tags those sources with their outlet's lean
+        story, coverage_skipped = await coverage.build(item, facts, client)
         await provenance.remember(item, hashes, job.report_id)
 
     # The media is the subject for posts, videos, uploads and images picked by URL; an article's header image is incidental
     has_media = bool(hashes) and bool(job.media_url or job.upload_path or item.platform not in ("article", "text"))
-    skipped = item.notes + trace.skipped + facts.skipped
+    skipped = item.notes + trace.skipped + facts.skipped + coverage_skipped
     if has_media and not settings.has_ai_detector:
         skipped.append("AI-generation detection (no t0-vision model or Hive key)")
 
@@ -135,6 +137,7 @@ async def _run(job: Job) -> None:
     # Only the submitted post on its own isn't a path worth showing
     report.spread = trace.spread if (has_media or len(trace.spread) > 1) else []
     report.claims = facts.claims
+    report.coverage = story
     report.summary = " ".join(filter(None, [facts.summary, trace.summary if has_media or trace.origin_url else ""]))
     report.sections = sections
     report.preview = await _preview(item, frames, job.report_id, kept)

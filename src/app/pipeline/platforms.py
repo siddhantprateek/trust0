@@ -45,6 +45,20 @@ def _bare_host(url: str) -> str:
     return host.removeprefix("www.")
 
 
+_DOMAIN_RE = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$")
+
+
+def normalize_domain(raw: str) -> str | None:
+    """A bare, lowercase domain (no scheme, path or port) for the extension's active-sites list, or None if raw
+    isn't a plausible domain. Accepts a bare domain or a full URL and keeps only the host."""
+    raw = raw.strip().lower()
+    if not raw:
+        return None
+    host = urlsplit(raw if "//" in raw else f"//{raw}").hostname or raw.split("/")[0].split(":")[0]
+    host = host.removeprefix("www.")
+    return host if _DOMAIN_RE.match(host) else None
+
+
 _IMAGE_PATH = re.compile(r"\.(jpe?g|png|gif|webp|avif|bmp|heic)$", re.I)
 
 

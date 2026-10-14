@@ -30,7 +30,7 @@ Every API key is optional. A stage whose key is missing is skipped, and the repo
 | `ANTHROPIC_API_KEY` | Used when `LLM_PROVIDER=anthropic`: Claude (`claude-opus-5-5`) with its own web search + web fetch tools |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | Used when `LLM_PROVIDER=openai`: OpenAI direct, via the Responses API and its hosted web search tool |
 | `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | Used when `LLM_PROVIDER=openrouter`: any model OpenRouter proxies to, with its "web" plugin for live search |
-| `SERPAPI_API_KEY` | Reverse image search (Google Lens) on the post's thumbnail |
+| `SERPAPI_API_KEY` | Reverse image search (Google Lens) on the post's thumbnail, and the Google News search behind coverage & bias |
 | `GOOGLE_FACTCHECK_API_KEY` | Published fact checks (ClaimReview) matching the content |
 | `T0_VISION_MODEL_PATH` | Our own AI-image detector, run locally (`[local]` extra). Trained in `experiments/ai-detect` |
 | `WHISPER_MODEL` | Local speech-to-text for videos without captions (`[local]` extra). Default `openai/whisper-large-v3-turbo` |
@@ -49,13 +49,16 @@ Every API key is optional. A stage whose key is missing is skipped, and the repo
 | `POST` | `/v1/reports` | Studio link/text check (`{"kind": "link", "url": "…"}` or `{"kind": "text", "text": "…"}`). Returns `202` with the report |
 | `POST` | `/v1/reports/upload` | Studio file upload (multipart `file`, image or video) |
 | `GET` | `/v1/reports`, `/v1/reports/{id}` | Report list and detail. Same shape as the studio's `Report` type, plus `claims`, `summary`, `signals` |
+| `GET` | `/v1/extension/active-sites` | Websites the extension scans automatically (studio Settings manages this; a right-click check always works regardless) |
+| `POST` | `/v1/extension/active-sites` | Add a website (`{"domain": "example.com"}`) |
+| `DELETE` | `/v1/extension/active-sites/{domain}` | Remove a website |
 
 The same URL checked again within `REUSE_REPORT_HOURS` returns the existing report. Tracking parameters and host aliases are ignored, so `twitter.com/…?s=20` and `x.com/…` count as the same URL.
 
 ## How a check works
 
 ```
-ingest ─▶ fingerprint ─▶ provenance ─┬─▶ fact check ─▶ score
+ingest ─▶ fingerprint ─▶ provenance ─┬─▶ fact check ─▶ coverage & bias ─▶ score
                      └─▶ AI detection ┘
 ```
 
@@ -76,7 +79,12 @@ ingest ─▶ fingerprint ─▶ provenance ─┬─▶ fact check ─▶ score
    The earliest dated step is marked `isOrigin`. Originality comes out as `original`, `reupload`, `modified-reupload` or `unknown`.
 4. **AI detection** (`services/local_models.py`, `services/external.py`): t0-vision on up to eight keyframes (mean score), and Hive on four if a key is set. With both, the report uses their mean and lists each under `signals.aiDetectors`. File metadata markers count too.
 5. **Fact check** (`pipeline/factcheck.py`): the configured LLM (`services/llm.py`, `LLM_PROVIDER`) picks up to five checkable claims, including what the media is said to show, and verifies each against the web. It prefers primary sources, wires, established outlets and fact-checkers. The provenance result goes into the prompt, because a video's real origin is often what exposes a false caption.
-6. **Score** (`pipeline/scoring.py`): transparent rules. Each point added or removed matches a check shown to the user. "Authentic" requires positive evidence (a clean detector result or a traced earlier source), so an untraced video with no detector run stays "unverified".
+6. **Coverage & bias** (`pipeline/coverage.py`), Ground News style: when the fact check says the content is about a news story, it also returns a short news query. A Google News search (SerpAPI) finds other outlets covering it, alongside the outlets the fact check cited. Each outlet counts once and gets a lean (`left`, `lean-left`, `center`, `lean-right`, `right`):
+   - From the curated table in `pipeline/outlets.py`, which follows public raters (AllSides, Ad Fontes Media, Media Bias/Fact Check). Edit it freely.
+   - Otherwise the LLM estimates it once, the result is stored in the `outlets` table, and the report marks it `estimated`. Platforms, government and academic sites are left unrated.
+
+   The report gets the Left / Center / Right counts and percentages, a `blindspot` when one side carries ≤20% of the rated coverage (needs at least 5 rated outlets), the checked article's own outlet lean, and a lean on every claim source. Lean belongs to outlets, never to facts.
+7. **Score** (`pipeline/scoring.py`): transparent rules. Each point added or removed matches a check shown to the user. "Authentic" requires positive evidence (a clean detector result or a traced earlier source), so an untraced video with no detector run stays "unverified".
 
 Downloaded media is deleted when a check finishes; only the hashes are kept.
 

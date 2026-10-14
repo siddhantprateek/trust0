@@ -45,10 +45,16 @@ class SpreadStep(BaseModel):
     is_origin: bool = Field(default=False, serialization_alias="isOrigin")
 
 
+# Political lean of a news outlet (never of a fact). Ratings follow public media-bias raters; see pipeline/outlets.py
+Lean = Literal["left", "lean-left", "center", "lean-right", "right"]
+
+
 class SourceRef(BaseModel):
     url: str
     title: str | None = None
     publisher: str | None = None
+    # Lean of the outlet that published this source, when it is a rated news outlet
+    lean: Lean | None = None
 
 
 class Claim(BaseModel):
@@ -108,6 +114,43 @@ class ReportSection(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class CoverageSource(BaseModel):
+    """One outlet covering the story, Ground News style: one entry per outlet, however many articles it ran."""
+
+    outlet: str
+    domain: str
+    url: str
+    title: str | None = None
+    published_at: str | None = Field(default=None, serialization_alias="publishedAt")
+    lean: Lean | None = None
+    # "table": from the curated ratings in pipeline/outlets.py. "estimated": the LLM's estimate, cached per outlet
+    rating: Literal["table", "estimated"] | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+class Coverage(BaseModel):
+    """Who is covering the story and how that coverage splits politically. Leans belong to outlets, not to facts."""
+
+    query: str = ""
+    sources: list[CoverageSource] = []
+    left: int = 0
+    center: int = 0
+    right: int = 0
+    unrated: int = 0
+    # Shares of the rated sources, 0-100, summing to 100 when anything is rated
+    left_pct: int = Field(default=0, serialization_alias="leftPct")
+    center_pct: int = Field(default=0, serialization_alias="centerPct")
+    right_pct: int = Field(default=0, serialization_alias="rightPct")
+    # The side that is barely covering it (Ground News' "blindspot"), when coverage is lopsided
+    blindspot: Literal["left", "right"] | None = None
+    # Lean of the outlet that published the checked content itself
+    subject_outlet: str | None = Field(default=None, serialization_alias="subjectOutlet")
+    subject_lean: Lean | None = Field(default=None, serialization_alias="subjectLean")
+
+    model_config = {"populate_by_name": True}
+
+
 class Report(BaseModel):
     id: str
     title: str
@@ -125,10 +168,25 @@ class Report(BaseModel):
     signals: Signals = Signals()
     # Separate verdicts for a post's text and its media, when it has both. The top-level verdict covers the whole post
     sections: list[ReportSection] = []
+    # Ground News-style coverage and bias distribution, for content about a news story
+    coverage: Coverage | None = None
     preview: Preview | None = None
     error: str | None = None
 
     model_config = {"populate_by_name": True}
+
+
+class ActiveSite(BaseModel):
+    """A website the browser extension is allowed to run on automatically (manual right-click checks always work)."""
+
+    domain: str
+    added_at: datetime = Field(serialization_alias="addedAt")
+
+    model_config = {"populate_by_name": True}
+
+
+class AddActiveSite(BaseModel):
+    domain: str
 
 
 class CheckResponse(BaseModel):

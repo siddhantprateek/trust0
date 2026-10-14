@@ -39,7 +39,7 @@ app.add_middleware(
     allow_origins=[o.strip() for o in get_settings().cors_origins.split(",") if o.strip()],
     # The browser extension calls from chrome-extension://<id>, which changes per install in development
     allow_origin_regex=r"^chrome-extension://[a-p]{32}$",
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["content-type"],
 )
 

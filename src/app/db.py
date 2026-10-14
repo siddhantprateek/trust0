@@ -43,15 +43,46 @@ class MediaRow(Base):
     frame_hashes: Mapped[list] = mapped_column(JSON)
 
 
+class OutletRow(Base):
+    """LLM-estimated lean for outlets missing from the curated table, so each one is estimated once and stays consistent."""
+
+    __tablename__ = "outlets"
+
+    domain: Mapped[str] = mapped_column(String(253), primary_key=True)
+    name: Mapped[str] = mapped_column(String(256), default="")
+    # Null when the outlet isn't a partisan news source or couldn't be rated
+    lean: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 settings = get_settings()
 settings.data_dir.mkdir(parents=True, exist_ok=True)
 engine = create_async_engine(settings.database_url)
 Session = async_sessionmaker(engine, expire_on_commit=False)
 
 
+# Domains the browser extension is allowed to run on automatically. Seeded once on first start; after that
+# the studio's Settings page is the source of truth. A manual right-click check always works regardless.
+DEFAULT_ACTIVE_SITES = (
+    "chatgpt.com", "chat.openai.com", "claude.ai", "gemini.google.com", "perplexity.ai", "copilot.microsoft.com",
+    "x.com", "twitter.com", "instagram.com", "reddit.com", "linkedin.com", "web.whatsapp.com", "youtube.com", "tiktok.com",
+)
+
+
+class ActiveSiteRow(Base):
+    __tablename__ = "active_sites"
+
+    domain: Mapped[str] = mapped_column(String(253), primary_key=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    async with Session() as session:
+        if await session.scalar(select(ActiveSiteRow.domain).limit(1)) is None:
+            session.add_all(ActiveSiteRow(domain=d) for d in DEFAULT_ACTIVE_SITES)
+            await session.commit()
 
 
 async def save_report(report: Report, content_key: str | None = None) -> None:
@@ -92,3 +123,44 @@ async def list_reports(limit: int = 50) -> list[Report]:
 async def add_media(session: AsyncSession, row: MediaRow) -> None:
     session.add(row)
     await session.commit()
+
+
+async def load_outlets(domains: list[str]) -> dict[str, OutletRow]:
+    if not domains:
+        return {}
+    async with Session() as session:
+        rows = await session.scalars(select(OutletRow).where(OutletRow.domain.in_(domains)))
+        return {row.domain: row for row in rows}
+
+
+async def save_outlets(rows: list[OutletRow]) -> None:
+    async with Session() as session:
+        for row in rows:
+            await session.merge(row)
+        await session.commit()
+
+
+async def list_active_sites() -> list[ActiveSiteRow]:
+    async with Session() as session:
+        rows = await session.scalars(select(ActiveSiteRow).order_by(ActiveSiteRow.added_at))
+        return list(rows)
+
+
+async def add_active_site(domain: str) -> ActiveSiteRow:
+    async with Session() as session:
+        row = await session.get(ActiveSiteRow, domain)
+        if row is None:
+            row = ActiveSiteRow(domain=domain)
+            session.add(row)
+            await session.commit()
+        return row
+
+
+async def remove_active_site(domain: str) -> bool:
+    async with Session() as session:
+        row = await session.get(ActiveSiteRow, domain)
+        if row is None:
+            return False
+        await session.delete(row)
+        await session.commit()
+        return True
