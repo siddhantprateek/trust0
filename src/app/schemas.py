@@ -139,8 +139,10 @@ class CoverageSource(BaseModel):
     title: str | None = None
     published_at: str | None = Field(default=None, serialization_alias="publishedAt")
     lean: Lean | None = None
-    # "table": from the curated ratings in pipeline/outlets.py. "estimated": the LLM's estimate, cached per outlet
+    # "table": from the curated ratings in pipeline/outlets.py. "estimated": researched by the LLM, cached per outlet
     rating: Literal["table", "estimated"] | None = None
+    # How sure the decision model was of an estimated lean, 0-1. None for curated ratings and estimates made without it
+    lean_confidence: float | None = Field(default=None, serialization_alias="leanConfidence")
 
     model_config = {"populate_by_name": True}
 

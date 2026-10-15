@@ -36,6 +36,7 @@ Every API key is optional. A stage whose key is missing is skipped, and the repo
 | `WHISPER_MODEL` | Local speech-to-text for videos without captions (`[local]` extra). Default `openai/whisper-large-v3-turbo` |
 | `LOCAL_DEVICE` | `auto`, `cuda` or `cpu` for the two local models. Use `cpu` while training on the GPU |
 | `HIVE_API_KEY` | AI-generated image/video detection on keyframes. Optional with t0-vision; both are averaged when set |
+| `DECISION_MODEL` / `DECISION_MIN_CONFIDENCE` | With `OPENAI_API_KEY` set, OpenAI's Decisions API (default `gpt-6-luna`) rates the lean of uncurated outlets from the LLM's research, with a confidence; below `DECISION_MIN_CONFIDENCE` (default 0.5) an outlet stays unrated. See `docs/decisions-outlet-lean.md` |
 | `REDDIT_CLIENT_ID` / `_SECRET` | Reddit post metadata, crosspost parents and link targets (Reddit blocks anonymous API calls) |
 | `YTDLP_COOKIES_FILE` | Logged-in access for Instagram, Facebook and some X posts |
 | `PREFER_IPV4` | Set `true` on networks where IPv6 is advertised but broken (requests hang otherwise) |
@@ -86,7 +87,7 @@ ingest ─▶ fingerprint ─▶ provenance ─┬─▶ fact check ─▶ cover
 5. **Fact check** (`pipeline/factcheck.py`): the configured LLM (`services/llm.py`, `LLM_PROVIDER`) picks up to five checkable claims, including what the media is said to show, and verifies each against the web. It prefers primary sources, wires, established outlets and fact-checkers. The provenance result goes into the prompt, because a video's real origin is often what exposes a false caption.
 6. **Coverage & bias** (`pipeline/coverage.py`), Ground News style: when the fact check says the content is about a news story, it also returns a short news query. A Google News search (SerpAPI) finds other outlets covering it, alongside the outlets the fact check cited. Each outlet counts once and gets a lean (`left`, `lean-left`, `center`, `lean-right`, `right`):
    - From the curated table in `pipeline/outlets.py`, which follows public raters (AllSides, Ad Fontes Media, Media Bias/Fact Check). Edit it freely.
-   - Otherwise the LLM estimates it once, the result is stored in the `outlets` table, and the report marks it `estimated`. Platforms, government and academic sites are left unrated.
+   - Otherwise it's estimated once, stored in the `outlets` table, and marked `estimated`. The LLM researches the outlet and writes up what the raters say; with an OpenAI key, OpenAI's Decisions API rates the lean from that write-up and returns a confidence (`leanConfidence`), and outlets it's unsure about stay unrated. Without a key, the LLM's own label is used. Platforms, government and academic sites are left unrated. Details in `docs/decisions-outlet-lean.md`.
 
    The report gets the Left / Center / Right counts and percentages, a `blindspot` when one side carries ≤20% of the rated coverage (needs at least 5 rated outlets), the checked article's own outlet lean, and a lean on every claim source. Lean belongs to outlets, never to facts.
 7. **Score** (`pipeline/scoring.py`): transparent rules. Each point added or removed matches a check shown to the user. "Authentic" requires positive evidence (a clean detector result or a traced earlier source), so an untraced video with no detector run stays "unverified".

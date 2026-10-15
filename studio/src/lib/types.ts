@@ -50,6 +50,8 @@ export type CoverageSource = {
   lean: Lean | null
   // 'table': curated rating; 'estimated': the model's estimate for an outlet missing from the table
   rating: 'table' | 'estimated' | null
+  // The decision model's confidence (0-1) in an estimated lean; missing on curated ratings and older reports
+  leanConfidence?: number | null
 }
 
 export type Coverage = {

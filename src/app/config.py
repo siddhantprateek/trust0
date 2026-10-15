@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     hive_api_key: str = ""
     ytdlp_cookies_file: str = ""
 
+    # OpenAI's Decisions API turns the LLM's research on an unknown outlet into a calibrated lean rating. Uses
+    # OPENAI_API_KEY whatever LLM_PROVIDER is; without it, the LLM's own label is used.
+    decision_model: str = "gpt-6-luna"
+    # Below this confidence the outlet stays unrated: a wrong lean is worse than none
+    decision_min_confidence: float = 0.5
+
     # Models that run on this machine; need the [local] extra (torch + transformers)
     # t0-vision: our fine-tuned AI-image detector (experiments/ai-detect). A checkpoint folder, e.g. C:/trust0-data/checkpoints/t0-vision/best
     t0_vision_model_path: str = ""
@@ -75,6 +81,10 @@ class Settings(BaseSettings):
         if self.llm_provider == "openai":
             return bool(self.openai_api_key)
         return bool(self.openrouter_api_key and self.openrouter_model)
+
+    @property
+    def has_decisions(self) -> bool:
+        return bool(self.openai_api_key and self.decision_model)
 
     @property
     def has_local_detector(self) -> bool:

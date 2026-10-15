@@ -169,7 +169,7 @@ export default function CoverageCard({ coverage }: { coverage: Coverage }) {
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <Favicon domain={source.domain} size={14} />
                       <span className="font-medium">{source.outlet}</span>
-                      <LeanBadge lean={source.lean} estimated={source.rating === 'estimated'} />
+                      <LeanBadge lean={source.lean} estimated={source.rating === 'estimated'} confidence={source.leanConfidence} />
                       {formatPublished(source.publishedAt) && (
                         <span className="text-xs text-muted-foreground">{formatPublished(source.publishedAt)}</span>
                       )}
@@ -204,7 +204,8 @@ export default function CoverageCard({ coverage }: { coverage: Coverage }) {
 
         <p className="border-t pt-3 text-xs text-muted-foreground">
           Outlet ratings are approximate and follow public media-bias raters (AllSides, Ad Fontes Media, Media
-          Bias/Fact Check). &ldquo;est.&rdquo; marks an outlet outside the curated list, rated by the model.
+          Bias/Fact Check). &ldquo;est.&rdquo; marks an outlet outside the curated list, rated from what those raters
+          publish; outlets the model isn&rsquo;t confident about are left unrated.
         </p>
       </CardContent>
     </Card>

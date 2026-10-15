@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, select
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -52,6 +52,8 @@ class OutletRow(Base):
     name: Mapped[str] = mapped_column(String(256), default="")
     # Null when the outlet isn't a partisan news source or couldn't be rated
     lean: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # The decision model's confidence in its answer, when it made the call
+    lean_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -93,6 +95,10 @@ class ApiKeyRow(Base):
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # create_all doesn't add columns to existing tables; older databases lack this one
+        columns = {row[1] for row in await conn.execute(text("PRAGMA table_info(outlets)"))}
+        if "lean_confidence" not in columns:
+            await conn.execute(text("ALTER TABLE outlets ADD COLUMN lean_confidence FLOAT"))
     async with Session() as session:
         if await session.scalar(select(ActiveSiteRow.domain).limit(1)) is None:
             session.add_all(ActiveSiteRow(domain=d) for d in DEFAULT_ACTIVE_SITES)
