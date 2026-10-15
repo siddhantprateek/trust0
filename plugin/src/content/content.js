@@ -429,7 +429,9 @@
     scheduleScan()
   })
 
-  Promise.all([getSettings(), chrome.runtime.sendMessage({ type: 'active-sites' }).catch(() => ({ domains: [] }))]).then(([loaded, { domains }]) => {
+  // sendMessage resolves undefined when the background worker doesn't answer (e.g. the extension was just reloaded)
+  const activeSites = chrome.runtime.sendMessage({ type: 'active-sites' }).then((reply) => reply ?? { domains: [] }, () => ({ domains: [] }))
+  Promise.all([getSettings(), activeSites]).then(([loaded, { domains }]) => {
     settings = loaded
     activeHere = hostMatchesSite(location.hostname, domains)
     observer = new MutationObserver(scheduleScan)
