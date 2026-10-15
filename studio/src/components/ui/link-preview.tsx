@@ -5,6 +5,7 @@ import * as React from "react"
 
 import { cn } from "cn"
 import { LinkHoverPreview } from "@/components/ui/link-hover-preview"
+import { faviconUrl } from "@/lib/favicon"
 
 interface LinkPreviewProps extends React.ComponentProps<"article"> {
   description?: string
@@ -40,6 +41,7 @@ function LinkPreview({
 }: LinkPreviewProps) {
   const [imageLoaded, setImageLoaded] = React.useState(false)
   const [imageFailed, setImageFailed] = React.useState(false)
+  const [faviconFailed, setFaviconFailed] = React.useState(false)
   let hostname: string
   try {
     hostname = new URL(url).hostname.replace("www.", "")
@@ -108,15 +110,29 @@ function LinkPreview({
             </LinkHoverPreview>
           )}
         </h3>
-        <p className="truncate text-muted-foreground">
+        <p className="flex items-center gap-1.5 truncate text-muted-foreground">
+          {!faviconFailed && (
+            <img
+              alt=""
+              aria-hidden="true"
+              className="size-3.5 shrink-0 rounded-[3px]"
+              height={14}
+              onError={() => setFaviconFailed(true)}
+              referrerPolicy="no-referrer"
+              src={faviconUrl(hostname, 32)}
+              width={14}
+            />
+          )}
           {price && (
             <>
               <span className="tabular-nums">{price}</span>
               <span aria-hidden="true"> · </span>
             </>
           )}
-          {siteName || hostname}
-          {seller && ` – ${seller}`}
+          <span className="truncate">
+            {siteName || hostname}
+            {seller && ` – ${seller}`}
+          </span>
         </p>
         {rating !== undefined && (
           <p

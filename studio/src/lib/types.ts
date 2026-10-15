@@ -14,7 +14,7 @@ export type SourceKind =
 // Media verdicts, plus accurate/mixed/inaccurate for text claims
 export type Verdict = 'likely-ai' | 'edited' | 'authentic' | 'accurate' | 'mixed' | 'inaccurate' | 'unverified'
 
-export type ReportStatus = 'complete' | 'analyzing' | 'failed'
+export type ReportStatus = 'complete' | 'analyzing' | 'failed' | 'cancelled'
 
 export type SpreadStep = {
   account: string
@@ -110,6 +110,28 @@ export type ReportSection = {
   checks: ReportCheck[]
 }
 
+export type StepStatus = 'pending' | 'running' | 'complete' | 'skipped' | 'failed' | 'cancelled'
+
+// One stage of the check pipeline (ingest, fingerprint, trace, …), saved live as the check runs
+export type ReportStep = {
+  id: string
+  label: string
+  status: StepStatus
+  detail: string | null
+  startedAt: string | null
+  endedAt: string | null
+}
+
+// A running or just-finished check, without the evidence, for the background-runs list
+export type RunSummary = {
+  id: string
+  title: string
+  status: ReportStatus
+  verdict: Verdict
+  createdAt: string
+  steps: ReportStep[]
+}
+
 export type Report = {
   id: string
   title: string
@@ -128,6 +150,7 @@ export type Report = {
   coverage: Coverage | null
   preview: Preview | null
   error: string | null
+  steps: ReportStep[]
 }
 
 export type CheckInput = { kind: 'link'; url: string } | { kind: 'text'; text: string }
@@ -145,4 +168,36 @@ export type LinkMeta = {
 export type ActiveSite = {
   domain: string
   addedAt: string
+}
+
+export type ModelStatus = 'available' | 'offline' | 'coming-soon'
+
+export type ModelInfo = {
+  id: string
+  name: string
+  task: string
+  description: string
+  inputs: string[]
+  labels: string[]
+  endpoint: string | null
+  status: ModelStatus
+  notes: string[]
+}
+
+export type ApiKey = {
+  id: string
+  name: string
+  prefix: string
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+/** Only returned when a key is created; the full key is never shown again */
+export type CreatedApiKey = ApiKey & { key: string }
+
+export type VisionPrediction = {
+  model: string
+  label: string
+  aiGenerated: number
+  scores: Record<string, number>
 }

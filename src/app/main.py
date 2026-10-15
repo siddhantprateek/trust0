@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import router
 from app.config import get_settings
 from app.db import init_db
+from app.models_api import router as models_router
 from app.services import local_models
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -40,7 +41,8 @@ app.add_middleware(
     # The browser extension calls from chrome-extension://<id>, which changes per install in development
     allow_origin_regex=r"^chrome-extension://[a-p]{32}$",
     allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["content-type"],
+    allow_headers=["content-type", "authorization"],
 )
 
 app.include_router(router)
+app.include_router(models_router)

@@ -82,6 +82,15 @@ def _score_frames(frames: list[Path]) -> float | None:
     return sum(scores) / len(scores)
 
 
+def classify_image(image: Image.Image) -> tuple[dict[str, float], float]:
+    """t0-vision's score for every label, plus the probability the image is AI-generated. For the public models API."""
+    classifier, ai_labels = _detector()
+    with _gpu:
+        output = classifier(image.convert("RGB"), top_k=None)
+    scores = {o["label"]: round(float(o["score"]), 4) for o in output}
+    return scores, round(sum(scores[label] for label in ai_labels), 4)
+
+
 # --- Whisper -------------------------------------------------------------------------------------
 
 

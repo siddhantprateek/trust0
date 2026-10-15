@@ -1,10 +1,15 @@
 import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, FileText, ImageIcon } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import ContentPreview from '@/components/custom/content-preview/content-preview.component'
 import CoverageCard from '@/components/custom/coverage-card/coverage-card.component'
+import Favicon from '@/components/custom/favicon/favicon.component'
 import LeanBadge from '@/components/custom/lean-badge/lean-badge.component'
 import LinkCard from '@/components/custom/link-card/link-card.component'
+import JobProgress from '@/components/custom/job-progress/job-progress.component'
 import PageHeading from '@/components/custom/page-heading/page-heading.component'
+import StoppedCheck from '@/components/custom/stopped-check/stopped-check.component'
+import ToolTimeline from '@/components/custom/tool-timeline/tool-timeline.component'
 import VerdictBadge from '@/components/custom/verdict-badge/verdict-badge.component'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +18,8 @@ import { LinkHoverPreview } from '@/components/ui/link-hover-preview'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useReport } from '@/hooks/use-reports'
+import { api } from '@/lib/api'
+import { domainFromUrl } from '@/lib/favicon'
 import { formatDate, leanSide, sourceLabel } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { ClaimSource, SpreadStep } from '@/lib/types'
@@ -70,7 +77,12 @@ export default function ReportDetailPage() {
 
       <ContentPreview report={report} />
 
-      {pending ? (
+      {report.status === 'analyzing' && report.steps.length > 0 ? (
+        <JobProgress title="Checking this content" steps={report.steps} onCancel={() => cancelCheck(report.id)} />
+      ) : report.status === 'cancelled' || (report.status === 'failed' && report.steps.length > 0) ? (
+        <StoppedCheck report={report} />
+      ) : pending ? (
+        // Reports saved before stage progress existed
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             {report.status === 'analyzing'
@@ -202,6 +214,7 @@ export default function ReportDetailPage() {
                       <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                         {claim.sources.map((source) => (
                           <span key={source.url} className="inline-flex items-center gap-1.5">
+                            <Favicon domain={domainFromUrl(source.url)} size={12} />
                             <LinkHoverPreview
                               url={source.url}
                               className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
@@ -246,12 +259,13 @@ export default function ReportDetailPage() {
                           step.isOrigin || i === 0 ? 'bg-primary' : 'bg-muted-foreground/40',
                         )}
                       />
-                      <p>
-                        <span className="font-medium">{step.account}</span>{' '}
+                      <p className="flex flex-wrap items-center gap-x-1.5">
+                        {step.url && <Favicon domain={domainFromUrl(step.url)} size={14} />}
+                        <span className="font-medium">{step.account}</span>
                         <span className="text-muted-foreground">
                           on {step.platform} · {step.postedAt}
                         </span>
-                        {step.isOrigin && <Badge className="ml-2 bg-primary/10 text-primary">Origin</Badge>}
+                        {step.isOrigin && <Badge className="bg-primary/10 text-primary">Origin</Badge>}
                       </p>
                       <p className="mt-0.5 text-muted-foreground">{step.note}</p>
                       {step.evidence && step.evidence !== 'submitted' && (
@@ -269,6 +283,8 @@ export default function ReportDetailPage() {
         </div>
       )}
 
+      {report.status === 'complete' && report.steps.length > 0 && <ToolTimeline steps={report.steps} defaultOpen={false} />}
+
       <Button variant="outline" asChild>
         <Link to="/reports">
           <ArrowLeft data-icon="inline-start" /> All reports
@@ -276,6 +292,15 @@ export default function ReportDetailPage() {
       </Button>
     </div>
   )
+}
+
+async function cancelCheck(reportId: string) {
+  try {
+    await api.cancelReport(reportId)
+  } catch (err) {
+    toast.error('Could not stop the check', { description: err instanceof Error ? err.message : String(err) })
+    throw err
+  }
 }
 
 /** Which sides of the spectrum the sources behind a claim come from: a claim confirmed across sides is sturdier. */

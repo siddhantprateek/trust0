@@ -58,6 +58,14 @@
   --lean-left: rgb(37, 99, 235);
   --lean-center: rgb(163, 163, 175);
   --lean-right: rgb(220, 38, 38);
+  /* CodeBlock syntax highlighting, mapped onto the chart palette so it tracks the rest of the theme */
+  --syntax-comment: var(--muted-foreground);
+  --syntax-keyword: var(--chart-2);
+  --syntax-string: var(--chart-1);
+  --syntax-function: var(--chart-4);
+  --syntax-number: var(--chart-3);
+  --syntax-property: var(--primary);
+  --syntax-punctuation: var(--muted-foreground);
   --shadow-x: 0px;
   --shadow-y: 2px;
   --shadow-blur: 3px;

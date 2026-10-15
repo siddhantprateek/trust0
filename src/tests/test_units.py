@@ -236,9 +236,28 @@ def test_detector_scores_are_averaged_into_one_probability(monkeypatch):
     async def hive(frames, client):
         return 0.5
 
+    class RecordingProgress:
+        def __init__(self):
+            self.events = []
+
+        async def start(self, step_id, detail=None):
+            self.events.append(("start", step_id, detail))
+
+        async def complete(self, step_id, detail=None):
+            self.events.append(("complete", step_id, detail))
+
+        async def skip(self, step_id, detail):
+            self.events.append(("skip", step_id, detail))
+
     monkeypatch.setattr(local_models, "ai_generated_score", t0)
     monkeypatch.setattr(external, "ai_generated_score", hive)
-    assert asyncio.run(runner._detect_ai([Path("x.jpg")], None)) == {"t0-vision": 0.9, "hive": 0.5}
+    progress = RecordingProgress()
+    assert asyncio.run(runner._detect_ai([Path("x.jpg")], None, progress)) == {"t0-vision": 0.9, "hive": 0.5}
+    assert progress.events[-1] == ("complete", "ai", "70% likely AI-generated · t0-vision, hive")
+
+    skipped = RecordingProgress()
+    assert asyncio.run(runner._detect_ai([], None, skipped)) == {}
+    assert skipped.events == [("skip", "ai", "No image or video to scan")]
 
 
 def test_httpx_request_urls_are_not_logged():

@@ -76,6 +76,20 @@ class ActiveSiteRow(Base):
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class ApiKeyRow(Base):
+    """A key for calling trust0's models over the API. Only a hash is stored; the key itself is shown once."""
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    # First characters of the key, so people can tell their keys apart in the studio
+    prefix: Mapped[str] = mapped_column(String(16))
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -108,10 +122,22 @@ async def find_recent_report(content_key: str, since: datetime) -> Report | None
     async with Session() as session:
         row = await session.scalar(
             select(ReportRow)
-            .where(ReportRow.content_key == content_key, ReportRow.created_at >= since, ReportRow.status != "failed")
+            .where(ReportRow.content_key == content_key, ReportRow.created_at >= since, ReportRow.status.not_in(("failed", "cancelled")))
             .order_by(ReportRow.created_at.desc())
         )
         return Report.model_validate(row.data) if row else None
+
+
+async def list_runs(since: datetime, limit: int = 10) -> list[Report]:
+    """Checks still running, plus any started since `since` (so a just-finished one stays visible for a while)."""
+    async with Session() as session:
+        rows = await session.scalars(
+            select(ReportRow)
+            .where((ReportRow.status == "analyzing") | (ReportRow.created_at >= since))
+            .order_by(ReportRow.created_at.desc())
+            .limit(limit)
+        )
+        return [Report.model_validate(row.data) for row in rows]
 
 
 async def list_reports(limit: int = 50) -> list[Report]:
@@ -164,3 +190,36 @@ async def remove_active_site(domain: str) -> bool:
         await session.delete(row)
         await session.commit()
         return True
+
+
+async def list_api_keys() -> list[ApiKeyRow]:
+    async with Session() as session:
+        rows = await session.scalars(select(ApiKeyRow).order_by(ApiKeyRow.created_at.desc()))
+        return list(rows)
+
+
+async def add_api_key(row: ApiKeyRow) -> ApiKeyRow:
+    async with Session() as session:
+        session.add(row)
+        await session.commit()
+        return row
+
+
+async def remove_api_key(key_id: str) -> bool:
+    async with Session() as session:
+        row = await session.get(ApiKeyRow, key_id)
+        if row is None:
+            return False
+        await session.delete(row)
+        await session.commit()
+        return True
+
+
+async def use_api_key(key_hash: str) -> ApiKeyRow | None:
+    """The key with this hash, stamped as just used, or None when no such key exists."""
+    async with Session() as session:
+        row = await session.scalar(select(ApiKeyRow).where(ApiKeyRow.key_hash == key_hash))
+        if row is not None:
+            row.last_used_at = utcnow()
+            await session.commit()
+        return row

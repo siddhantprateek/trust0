@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "studio",
+      "url": "http://localhost:5174"
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["--cwd=D:/Projects/trust0/web", "run", "dev", "--", "--port", "5180", "--strictPort"],
+      "port": 5180
+    }
+  ]
+}

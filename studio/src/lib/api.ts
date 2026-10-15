@@ -1,6 +1,14 @@
-import type { ActiveSite, CheckInput, LinkMeta, Preview, Report } from '@/lib/types'
+import type { ActiveSite, ApiKey, CheckInput, CreatedApiKey, LinkMeta, ModelInfo, Preview, Report, RunSummary } from '@/lib/types'
 
-const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '')
+export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '')
+
+// Fired after a check is started or cancelled, so the background-runs indicator updates without waiting for its next poll
+export const RUNS_CHANGED_EVENT = 'trust0:runs-changed'
+
+function announceRuns<T>(result: T): T {
+  window.dispatchEvent(new Event(RUNS_CHANGED_EVENT))
+  return result
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
@@ -48,6 +56,7 @@ function normalize(report: Report): Report {
     sections: report.sections ?? [],
     coverage: report.coverage ?? null,
     preview,
+    steps: report.steps ?? [],
   }
 }
 
@@ -59,7 +68,10 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
-    }),
+    }).then(announceRuns),
+  cancelReport: (id: string) =>
+    request<Report>(`/v1/reports/${encodeURIComponent(id)}/cancel`, { method: 'POST' }).then(normalize).then(announceRuns),
+  listRuns: () => request<RunSummary[]>('/v1/runs'),
   linkPreview: (url: string) => request<LinkMeta>(`/v1/link-preview?url=${encodeURIComponent(url)}`),
   listActiveSites: () => request<ActiveSite[]>('/v1/extension/active-sites'),
   addActiveSite: (domain: string) =>
@@ -70,9 +82,19 @@ export const api = {
     }),
   removeActiveSite: (domain: string) =>
     request<void>(`/v1/extension/active-sites/${encodeURIComponent(domain)}`, { method: 'DELETE' }),
+  listModels: () => request<ModelInfo[]>('/v1/models'),
+  getModel: (id: string) => request<ModelInfo>(`/v1/models/${encodeURIComponent(id)}`),
+  listApiKeys: () => request<ApiKey[]>('/v1/api-keys'),
+  createApiKey: (name: string) =>
+    request<CreatedApiKey>('/v1/api-keys', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }),
+  deleteApiKey: (id: string) => request<void>(`/v1/api-keys/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   uploadReport: (file: File) => {
     const body = new FormData()
     body.append('file', file)
-    return request<Report>('/v1/reports/upload', { method: 'POST', body })
+    return request<Report>('/v1/reports/upload', { method: 'POST', body }).then(announceRuns)
   },
 }

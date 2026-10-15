@@ -1,3 +1,4 @@
+import { CircleStop, LoaderCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { verdictLabels } from '@/lib/format'
 import type { ReportStatus, Verdict } from '@/lib/types'
@@ -20,10 +21,23 @@ type VerdictBadgeProps = {
 
 export default function VerdictBadge({ verdict, status }: VerdictBadgeProps) {
   if (status === 'analyzing') {
-    return <Badge className="bg-primary/10 text-primary">Analyzing…</Badge>
+    return (
+      <Badge className="bg-primary/10 text-primary">
+        <LoaderCircle data-icon="inline-start" className="animate-spin motion-reduce:animate-none" />
+        Analyzing
+      </Badge>
+    )
   }
   if (status === 'failed') {
     return <Badge className="bg-muted text-muted-foreground">Failed</Badge>
+  }
+  if (status === 'cancelled') {
+    return (
+      <Badge className="bg-muted text-muted-foreground">
+        <CircleStop data-icon="inline-start" />
+        Cancelled
+      </Badge>
+    )
   }
   return <Badge className={cn(verdictStyles[verdict])}>{verdictLabels[verdict]}</Badge>
 }

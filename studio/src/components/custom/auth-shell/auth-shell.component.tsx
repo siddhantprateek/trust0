@@ -10,14 +10,14 @@ export default function AuthShell({ children }: AuthShellProps) {
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col p-6 md:p-10">
-        <Logo />
+        <Logo mark />
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-1 items-center justify-center py-10"
         >
-          {children}
+          <div className="w-full max-w-md">{children}</div>
         </motion.div>
       </div>
 

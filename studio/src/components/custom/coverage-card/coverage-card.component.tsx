@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, EyeOff } from 'lucide-react'
 import { HoverCard as HoverCardPrimitive } from 'radix-ui'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import Favicon from '@/components/custom/favicon/favicon.component'
 import LeanBadge from '@/components/custom/lean-badge/lean-badge.component'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LinkHoverPreview } from '@/components/ui/link-hover-preview'
@@ -26,9 +27,18 @@ function formatPublished(value: string | null) {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(date)
 }
 
+const FILTERS = ['all', 'left', 'center', 'right'] as const
+
 export default function CoverageCard({ coverage }: { coverage: Coverage }) {
   const [filter, setFilter] = useState<Filter>('all')
   const [expanded, setExpanded] = useState(false)
+  const tabRefs = useRef<Record<Filter, HTMLButtonElement | null>>({ all: null, left: null, center: null, right: null })
+  const [indicator, setIndicator] = useState({ left: 0, width: 0, ready: false })
+
+  useLayoutEffect(() => {
+    const el = tabRefs.current[filter]
+    if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth, ready: true })
+  }, [filter, coverage])
   const rated = coverage.left + coverage.center + coverage.right
   const pct = { left: coverage.leftPct, center: coverage.centerPct, right: coverage.rightPct }
   const counts = { left: coverage.left, center: coverage.center, right: coverage.right }
@@ -109,26 +119,40 @@ export default function CoverageCard({ coverage }: { coverage: Coverage }) {
 
         {coverage.sources.length > 0 && (
           <div className="space-y-3">
-            <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter outlets by lean">
-              {(['all', 'left', 'center', 'right'] as const).map((value) => {
+            <div className="relative flex gap-5 border-b" role="tablist" aria-label="Filter outlets by lean">
+              {FILTERS.map((value) => {
                 const count = value === 'all' ? coverage.sources.length : counts[value]
+                const dot = value === 'all' ? null : SIDES.find((s) => s.side === value)?.dot
                 return (
                   <button
                     key={value}
+                    ref={(el) => {
+                      tabRefs.current[value] = el
+                    }}
                     type="button"
                     role="tab"
                     aria-selected={filter === value}
                     disabled={count === 0}
                     onClick={() => selectFilter(value)}
                     className={cn(
-                      'rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40',
-                      filter === value ? 'border-foreground bg-foreground text-background' : 'hover:bg-muted',
+                      'flex items-center gap-1.5 pb-2 text-sm font-medium transition-colors disabled:opacity-40',
+                      filter === value ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
-                    {value === 'all' ? 'All' : leanLabels[value]} {count}
+                    {dot && <span aria-hidden className={cn('size-2 rounded-full', dot)} />}
+                    {value === 'all' ? 'All' : leanLabels[value]}
+                    <span className="text-xs text-muted-foreground">{count}</span>
                   </button>
                 )
               })}
+              <span
+                aria-hidden
+                className={cn(
+                  'absolute bottom-0 h-0.5 rounded-full bg-foreground transition-[left,width] duration-300 ease-out',
+                  !indicator.ready && 'opacity-0',
+                )}
+                style={{ left: indicator.left, width: indicator.width }}
+              />
             </div>
 
             <ul className="divide-y">
@@ -143,6 +167,7 @@ export default function CoverageCard({ coverage }: { coverage: Coverage }) {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <Favicon domain={source.domain} size={14} />
                       <span className="font-medium">{source.outlet}</span>
                       <LeanBadge lean={source.lean} estimated={source.rating === 'estimated'} />
                       {formatPublished(source.publishedAt) && (
@@ -213,8 +238,11 @@ function SegmentTooltip({ label, outlets, total, children }: SegmentTooltipProps
           </p>
           <ul className="mt-2 space-y-1">
             {outlets.slice(0, SEGMENT_PREVIEW).map((o) => (
-              <li key={o.domain} className="flex items-center justify-between gap-2 truncate text-xs">
-                <span className="truncate">{o.outlet}</span>
+              <li key={o.domain} className="flex items-center justify-between gap-2 text-xs">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Favicon domain={o.domain} size={12} />
+                  <span className="truncate">{o.outlet}</span>
+                </span>
                 {o.rating === 'estimated' && <span className="shrink-0 text-muted-foreground">est.</span>}
               </li>
             ))}

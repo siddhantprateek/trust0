@@ -2,12 +2,20 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { Report } from '@/lib/types'
 
-const POLL_MS = 3000
+// The list carries every report's preview, so it polls gently; one report polls fast enough to watch its stages
+const LIST_POLL_MS = 3000
+const REPORT_POLL_MS = 1000
 
 type State<T> = { data: T; loading: boolean; error: string | null }
 
 /** Fetches with `load`, and keeps refetching every few seconds while `isPending(data)` is true. */
-function usePolled<T>(load: () => Promise<T>, isPending: (data: T) => boolean, initial: T, key: string): State<T> {
+function usePolled<T>(
+  load: () => Promise<T>,
+  isPending: (data: T) => boolean,
+  initial: T,
+  key: string,
+  intervalMs: number,
+): State<T> {
   const [state, setState] = useState<State<T>>({ data: initial, loading: true, error: null })
 
   useEffect(() => {
@@ -19,7 +27,7 @@ function usePolled<T>(load: () => Promise<T>, isPending: (data: T) => boolean, i
         const data = await load()
         if (cancelled) return
         setState({ data, loading: false, error: null })
-        if (isPending(data)) timer = setTimeout(tick, POLL_MS)
+        if (isPending(data)) timer = setTimeout(tick, intervalMs)
       } catch (err) {
         if (cancelled) return
         setState((prev) => ({ ...prev, loading: false, error: err instanceof Error ? err.message : String(err) }))
@@ -38,7 +46,7 @@ function usePolled<T>(load: () => Promise<T>, isPending: (data: T) => boolean, i
 }
 
 export function useReports() {
-  return usePolled<Report[]>(api.listReports, (reports) => reports.some((r) => r.status === 'analyzing'), [], 'list')
+  return usePolled<Report[]>(api.listReports, (reports) => reports.some((r) => r.status === 'analyzing'), [], 'list', LIST_POLL_MS)
 }
 
 export function useReport(id: string | undefined) {
@@ -47,5 +55,6 @@ export function useReport(id: string | undefined) {
     (report) => report?.status === 'analyzing',
     null,
     id ?? '',
+    REPORT_POLL_MS,
   )
 }

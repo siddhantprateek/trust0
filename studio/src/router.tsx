@@ -3,13 +3,17 @@ import type { CrumbHandle } from '@/components/custom/site-header/site-header.co
 import DashboardLayout from '@/layouts/dashboard.layout'
 import RootLayout from '@/layouts/root.layout'
 import {
+  ModelDetailPage,
+  ModelsPage,
   NewCheckPage,
   NotFoundPage,
   OverviewPage,
+  PlaygroundPage,
   ReportDetailPage,
   ReportsPage,
   SettingsAccountPage,
   SettingsAllowListPage,
+  SettingsApiKeysPage,
   SignInPage,
   SignUpPage,
 } from '@/pages'
@@ -41,11 +45,26 @@ export const router = createBrowserRouter([
             ],
           },
           {
+            path: 'models',
+            handle: { crumb: 'Models' } satisfies CrumbHandle,
+            children: [
+              { index: true, element: <ModelsPage /> },
+              {
+                path: ':modelId',
+                element: <ModelDetailPage />,
+                // Model ids double as their display name (t0-vision, t0-video, …)
+                handle: { crumb: (params) => params.modelId ?? 'Model' } satisfies CrumbHandle,
+              },
+            ],
+          },
+          { path: 'playground', element: <PlaygroundPage />, handle: { crumb: 'Playground' } satisfies CrumbHandle },
+          {
             path: 'settings',
             handle: { crumb: 'Settings' } satisfies CrumbHandle,
             children: [
               { index: true, element: <Navigate to="allow-list" replace /> },
               { path: 'allow-list', element: <SettingsAllowListPage />, handle: { crumb: 'Allow list' } satisfies CrumbHandle },
+              { path: 'api-keys', element: <SettingsApiKeysPage />, handle: { crumb: 'API keys' } satisfies CrumbHandle },
               // Clerk needs the full subtree (security tab, verification steps, …)
               { path: 'account/*', element: <SettingsAccountPage />, handle: { crumb: 'Account' } satisfies CrumbHandle },
             ],

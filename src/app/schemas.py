@@ -11,7 +11,7 @@ SourceKind = Literal["instagram", "x", "youtube", "tiktok", "reddit", "facebook"
 # Media verdicts match the studio; accurate/mixed/inaccurate are for text claims (AI answers, articles, selections)
 Verdict = Literal["likely-ai", "edited", "authentic", "accurate", "mixed", "inaccurate", "unverified"]
 
-ReportStatus = Literal["analyzing", "complete", "failed"]
+ReportStatus = Literal["analyzing", "complete", "failed", "cancelled"]
 
 CheckKind = Literal["ai-response", "post", "message", "video", "article", "image", "link", "selection", "page", "text", "upload"]
 
@@ -114,6 +114,22 @@ class ReportSection(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+StepStatus = Literal["pending", "running", "complete", "skipped", "failed", "cancelled"]
+
+
+class ReportStep(BaseModel):
+    """One stage of the check pipeline, saved as it starts and ends so the studio can show live progress."""
+
+    id: str
+    label: str
+    status: StepStatus = "pending"
+    detail: str | None = None
+    started_at: datetime | None = Field(default=None, serialization_alias="startedAt")
+    ended_at: datetime | None = Field(default=None, serialization_alias="endedAt")
+
+    model_config = {"populate_by_name": True}
+
+
 class CoverageSource(BaseModel):
     """One outlet covering the story, Ground News style: one entry per outlet, however many articles it ran."""
 
@@ -172,6 +188,20 @@ class Report(BaseModel):
     coverage: Coverage | None = None
     preview: Preview | None = None
     error: str | None = None
+    steps: list[ReportStep] = []
+
+    model_config = {"populate_by_name": True}
+
+
+class RunSummary(BaseModel):
+    """A check that's running or just finished, without the heavy evidence, for the studio's background-runs list."""
+
+    id: str
+    title: str
+    status: ReportStatus
+    verdict: Verdict = "unverified"
+    created_at: datetime = Field(serialization_alias="createdAt")
+    steps: list[ReportStep] = []
 
     model_config = {"populate_by_name": True}
 
@@ -202,3 +232,56 @@ class CheckResponse(BaseModel):
     sections: list[ReportSection] = []
     report_url: str = Field(serialization_alias="reportUrl")
     poll_url: str = Field(serialization_alias="pollUrl")
+
+
+# --- Models API ----------------------------------------------------------------------------------
+
+ModelStatus = Literal["available", "offline", "coming-soon"]
+
+
+class ModelInfo(BaseModel):
+    """One of trust0's own models, as the studio's Models page and GET /v1/models list it."""
+
+    id: str
+    name: str
+    task: str
+    description: str
+    inputs: list[str]
+    labels: list[str]
+    endpoint: str | None
+    # "offline" is a released model this server hasn't loaded (no checkpoint configured)
+    status: ModelStatus
+    # Short, true facts the models page lists next to the description (limits, auth, how it runs)
+    notes: list[str] = []
+
+    model_config = {"populate_by_name": True}
+
+
+class VisionPrediction(BaseModel):
+    model: str
+    label: str
+    # Probability the image is AI-generated, 0–1
+    ai_generated: float = Field(serialization_alias="aiGenerated")
+    scores: dict[str, float]
+
+    model_config = {"populate_by_name": True}
+
+
+class ApiKey(BaseModel):
+    id: str
+    name: str
+    prefix: str
+    created_at: datetime = Field(serialization_alias="createdAt")
+    last_used_at: datetime | None = Field(serialization_alias="lastUsedAt")
+
+    model_config = {"populate_by_name": True, "from_attributes": True}
+
+
+class CreatedApiKey(ApiKey):
+    """Returned once, when the key is created. Only a hash is kept after that."""
+
+    key: str
+
+
+class CreateApiKey(BaseModel):
+    name: str = Field(min_length=1, max_length=100)

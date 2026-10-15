@@ -48,10 +48,15 @@ Every API key is optional. A stage whose key is missing is skipped, and the repo
 | `GET` | `/v1/checks/{id}` | Extension polling |
 | `POST` | `/v1/reports` | Studio link/text check (`{"kind": "link", "url": "…"}` or `{"kind": "text", "text": "…"}`). Returns `202` with the report |
 | `POST` | `/v1/reports/upload` | Studio file upload (multipart `file`, image or video) |
-| `GET` | `/v1/reports`, `/v1/reports/{id}` | Report list and detail. Same shape as the studio's `Report` type, plus `claims`, `summary`, `signals` |
+| `GET` | `/v1/reports`, `/v1/reports/{id}` | Report list and detail. Same shape as the studio's `Report` type, plus `claims`, `summary`, `signals`, and `steps` (each pipeline stage's status, detail and timings, saved live while the check runs) |
+| `GET` | `/v1/runs` | Checks still running plus any started in the last 15 minutes: id, title, status, verdict and `steps` only, light enough to poll |
 | `GET` | `/v1/extension/active-sites` | Websites the extension scans automatically (studio Settings manages this; a right-click check always works regardless) |
 | `POST` | `/v1/extension/active-sites` | Add a website (`{"domain": "example.com"}`) |
 | `DELETE` | `/v1/extension/active-sites/{domain}` | Remove a website |
+| `GET` | `/v1/models`, `/v1/models/{id}` | trust0's own models (t0-vision, upcoming ones) and whether this server has each loaded |
+| `POST` | `/v1/models/predict` | Public API. Needs `Authorization: Bearer t0_…`. Multipart `model` (e.g. `t0-vision`) and `file` (JPEG/PNG/WebP, ≤ 20 MB). Returns `label`, `aiGenerated` (0–1) and per-label `scores` |
+| `GET`, `POST` | `/v1/api-keys` | Studio. List keys, or create one (`{"name": "…"}`); the full key is only in the create response |
+| `DELETE` | `/v1/api-keys/{id}` | Revoke a key |
 
 The same URL checked again within `REUSE_REPORT_HOURS` returns the existing report. Tracking parameters and host aliases are ignored, so `twitter.com/…?s=20` and `x.com/…` count as the same URL.
 

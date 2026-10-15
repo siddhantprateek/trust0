@@ -7,10 +7,14 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 
 from app.config import get_settings
-from app.db import add_active_site, find_recent_report, list_active_sites, list_reports, load_report, remove_active_site, save_report
+from app.db import add_active_site, find_recent_report, list_active_sites, list_reports, list_runs, load_report, remove_active_site, save_report
 from app.pipeline import linkpreview, runner
 from app.pipeline.platforms import canonical_url, content_key, detect_platform, is_image_url, normalize_domain
-from app.schemas import ActiveSite, AddActiveSite, CheckRequest, CheckResponse, Report
+from app.pipeline.progress import initial_steps
+from app.schemas import ActiveSite, AddActiveSite, CheckRequest, CheckResponse, Report, RunSummary
+
+# How long a finished check stays in the studio's background-runs list
+RECENT_RUN_MINUTES = 15
 
 router = APIRouter(prefix="/v1")
 
@@ -95,6 +99,35 @@ async def upload_report(file: UploadFile = File(...)) -> Report:
 @router.get("/reports", response_model=list[Report], tags=["studio"])
 async def get_reports(limit: int = 50) -> list[Report]:
     return await list_reports(min(limit, 200))
+
+
+@router.post("/reports/{report_id}/cancel", response_model=Report, tags=["studio"])
+async def cancel_report(report_id: str) -> Report:
+    """Stop a running check. Finished stages keep their results; the stage in flight is marked cancelled."""
+    report = await _get(report_id)
+    if report.status != "analyzing":
+        raise HTTPException(status.HTTP_409_CONFLICT, "This check has already finished.")
+    task = _tasks.get(report_id)
+    if task is not None:
+        task.cancel()
+        # The runner records the cancellation as it unwinds; wait so the response shows it
+        await asyncio.wait({task}, timeout=5)
+    else:
+        # The server restarted mid-check, so nothing is running it any more
+        report.status = "cancelled"
+        report.steps = [step.model_copy(update={"status": "cancelled"}) if step.status == "running" else step for step in report.steps]
+        await save_report(report)
+    return await _get(report_id)
+
+
+@router.get("/runs", response_model=list[RunSummary], tags=["studio"])
+async def get_runs() -> list[RunSummary]:
+    """Running and recently finished checks with their stage progress, light enough to poll every couple of seconds."""
+    since = datetime.now(timezone.utc) - timedelta(minutes=RECENT_RUN_MINUTES)
+    return [
+        RunSummary(id=r.id, title=r.title, status=r.status, verdict=r.verdict, created_at=r.created_at, steps=r.steps)
+        for r in await list_runs(since)
+    ]
 
 
 @router.get("/reports/{report_id}", response_model=Report, tags=["studio"])
@@ -182,6 +215,7 @@ def _new_report(*, kind: str, url: str | None, title: str | None, text_subject: 
         kind=kind,
         status="analyzing",
         created_at=datetime.now(timezone.utc),
+        steps=initial_steps(),
     )
 
 
@@ -213,6 +247,8 @@ def _check_response(report: Report, request: Request) -> CheckResponse:
         summary = "Still checking. Tracing sources and verifying claims can take a minute."
     elif report.status == "failed":
         summary = "This check failed. Try again in a moment."
+    elif report.status == "cancelled":
+        summary = "This check was cancelled before it finished."
     else:
         summary = report.summary
     return CheckResponse(
