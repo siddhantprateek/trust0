@@ -30,6 +30,29 @@ def _client() -> openai.AsyncOpenAI:
     return openai.AsyncOpenAI(api_key=get_settings().openai_api_key, max_retries=3, timeout=30)
 
 
+def _encode(input: str | dict | list) -> str:
+    return input if isinstance(input, str) else json.dumps(input, ensure_ascii=False)
+
+
+async def predicates(input: str | dict | list, questions: dict[str, str]) -> dict[str, float] | None:
+    """Probability (0-1) that each statement holds for the input, by question name, all in one request.
+
+    None when decisions aren't configured or the call fails. A refused question is left out of the result.
+    """
+    if not get_settings().has_decisions or not questions:
+        return None
+    try:
+        decision = await _client().decisions.create(
+            model=get_settings().decision_model,
+            input=_encode(input),
+            questions=[{"type": "predicate", "name": name, "instructions": text} for name, text in questions.items()],
+        )
+    except openai.OpenAIError as exc:
+        log.warning("Decisions request failed: %s", exc)
+        return None
+    return {a.name: a.probability for a in decision.answers if a.type == "predicate" and a.name in questions}
+
+
 async def choice(input: str | dict, instructions: str, choices: dict[str, str]) -> Choice | None:
     """One choice question about the input. None when decisions aren't configured, the model refuses, or the call fails."""
     settings = get_settings()
@@ -38,7 +61,7 @@ async def choice(input: str | dict, instructions: str, choices: dict[str, str]) 
     try:
         decision = await _client().decisions.create(
             model=settings.decision_model,
-            input=input if isinstance(input, str) else json.dumps(input, ensure_ascii=False),
+            input=_encode(input),
             questions=[
                 {
                     "type": "choice",

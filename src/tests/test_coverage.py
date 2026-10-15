@@ -37,8 +37,14 @@ def test_percentages_always_sum_to_100():
     assert coverage._percentages([0, 3, 0]) == (0, 100, 0)
 
 
-def _run(monkeypatch, articles, claims=(), query="flood in valencia", item=None, estimates=None, decision=..., decision_calls=None):
-    """decision: what the Decisions API returns (a decisions.Choice, or None for a failed call). Left out, it isn't configured."""
+def _run(monkeypatch, articles, claims=(), query="flood in valencia", item=None, estimates=None, decision=..., decision_calls=None, on_story=None, on_story_calls=None):
+    """decision: what the Decisions API returns for a lean (a decisions.Choice, or None for a failed call); left out,
+    it isn't configured. on_story: probabilities by question name for the relevance check; None keeps every article."""
+
+    async def fake_predicates(input, questions):
+        if on_story_calls is not None:
+            on_story_calls.append((input, questions))
+        return on_story
 
     async def fake_news(q, client):
         return articles
@@ -54,6 +60,7 @@ def _run(monkeypatch, articles, claims=(), query="flood in valencia", item=None,
     monkeypatch.setattr(coverage.external, "search_news", fake_news)
     monkeypatch.setattr(coverage.llm, "research", fake_research)
     monkeypatch.setattr(coverage.decisions, "choice", fake_choice)
+    monkeypatch.setattr(coverage.decisions, "predicates", fake_predicates)
     monkeypatch.setattr(coverage.get_settings(), "serpapi_api_key", "test")
     monkeypatch.setattr(type(coverage.get_settings()), "has_llm", property(lambda self: True))
     monkeypatch.setattr(type(coverage.get_settings()), "has_decisions", property(lambda self: decision is not ...))
@@ -200,6 +207,53 @@ def test_decisions_client_gives_up_on_an_api_error(monkeypatch):
     request = httpx.Request("POST", "https://api.openai.com/v1/decisions")
     _fake_client(monkeypatch, openai.AuthenticationError("invalid key", response=httpx.Response(401, request=request), body=None))
     assert asyncio.run(decisions.choice("state", "Which?", {"a": "A", "b": "B"})) is None
+
+
+def test_no_coverage_when_only_the_claim_sources_are_news_outlets(monkeypatch):
+    # An ad checked against news sites isn't a story outlets are covering, but its sources still show their lean
+    claim = Claim(text="Figma launched an agent", verdict="supported", explanation="", sources=[SourceRef(url="https://www.reuters.com/tech/figma")])
+    story, _ = _run(monkeypatch, [_article("cnn.com")], claims=[claim], query="")
+    assert story is None
+    assert claim.sources[0].lean == "center"
+
+
+def test_articles_off_the_story_are_dropped(monkeypatch):
+    calls = []
+    articles = [_article("cnn.com"), _article("coursera.org", "Coursera"), _article("foxnews.com")]
+    claim = Claim(text="It flooded", verdict="supported", explanation="", sources=[SourceRef(url="https://www.adsoftheworld.com/campaign")])
+    # a0 cnn, a1 coursera, a2 foxnews, a3 the ad archive the fact check cited
+    on_story = {"a0": 0.97, "a1": 0.02, "a2": 0.9, "a3": 0.1}
+    story, _ = _run(monkeypatch, articles, claims=[claim], on_story=on_story, on_story_calls=calls)
+    assert [s.domain for s in story.sources] == ["cnn.com", "foxnews.com"]
+    (input, questions), = calls
+    assert input["story"] == "flood in valencia"
+    assert [a["id"] for a in input["articles"]] == ["a0", "a1", "a2", "a3"]
+    assert "`a1`" in questions["a1"]
+
+
+def test_checked_article_is_kept_even_if_nothing_else_is_on_the_story(monkeypatch):
+    item = Ingested(platform="article", url="https://www.theguardian.com/world/story", title="Story")
+    story, _ = _run(monkeypatch, [_article("coursera.org")], item=item, on_story={"a0": 0.01})
+    assert [s.domain for s in story.sources] == ["theguardian.com"]
+
+
+def test_decisions_client_asks_named_predicates_in_one_request(monkeypatch):
+    usage = {"input_tokens": 90, "input_tokens_details": {"cache_write_tokens": 0, "cached_tokens": 0}, "output_tokens": 0, "output_tokens_details": {"reasoning_tokens": 0}, "total_tokens": 90}
+    sent = _fake_client(monkeypatch, Decision.model_validate({
+        "model": "gpt-6-luna",
+        "answers": [
+            {"type": "predicate", "name": "a0", "probability": 0.94},
+            {"type": "refusal", "name": "a1"},
+        ],
+        "usage": usage,
+    }))
+    answers = asyncio.run(decisions.predicates({"story": "x"}, {"a0": "First holds", "a1": "Second holds"}))
+    assert answers == {"a0": 0.94}
+    (request,) = sent
+    assert request["questions"] == [
+        {"type": "predicate", "name": "a0", "instructions": "First holds"},
+        {"type": "predicate", "name": "a1", "instructions": "Second holds"},
+    ]
 
 
 def test_article_reports_its_own_outlets_lean(monkeypatch):
