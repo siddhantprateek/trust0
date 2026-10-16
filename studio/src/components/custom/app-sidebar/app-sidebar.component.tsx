@@ -1,4 +1,16 @@
-import { Boxes, ChevronRight, FileSearch, FlaskConical, Globe, KeyRound, LayoutDashboard, PlusCircle, Settings, UserCog } from 'lucide-react'
+import {
+  Boxes,
+  ChevronRight,
+  FileSearch,
+  FlaskConical,
+  Globe,
+  KeyRound,
+  LayoutDashboard,
+  PlusCircle,
+  Server,
+  Settings,
+  UserCog,
+} from 'lucide-react'
 import { Collapsible as CollapsiblePrimitive } from 'radix-ui'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
@@ -39,6 +51,7 @@ const workspaceItems = [
 const settingsItems = [
   { title: 'Allow list', to: '/settings/allow-list', icon: Globe },
   { title: 'API keys', to: '/settings/api-keys', icon: KeyRound },
+  { title: 'Server', to: '/settings/server', icon: Server },
   { title: 'Account', to: '/settings/account', icon: UserCog },
 ]
 
