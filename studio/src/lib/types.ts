@@ -81,6 +81,9 @@ export type Signals = {
   aiDetectors: Record<string, number>
   // Jev's visual review of the keyframes: mean probability they're AI-generated. Missing on older reports
   aiReview?: number | null
+  // P(ai-generated) for each reviewed frame and the Jev version behind aiReview. Missing on older reports
+  aiReviewFrames?: number[]
+  aiReviewModel?: string | null
   c2pa: string | null
   originality: 'original' | 'reupload' | 'modified-reupload' | 'unknown'
   originUrl: string | null

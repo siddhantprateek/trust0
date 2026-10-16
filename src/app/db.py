@@ -57,6 +57,20 @@ class OutletRow(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class VisualReviewRow(Base):
+    """Jev's visual review of a piece of media, keyed by its first keyframe's perceptual hash, so re-uploads reuse it."""
+
+    __tablename__ = "visual_reviews"
+
+    frame_hash: Mapped[str] = mapped_column(String(32), primary_key=True)
+    # A review from another Jev version isn't reused: answers change between versions
+    model: Mapped[str] = mapped_column(String(64), primary_key=True)
+    mean: Mapped[float] = mapped_column(Float)
+    # P(ai-generated) for each reviewed frame, in order
+    frames: Mapped[list] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 settings = get_settings()
 settings.data_dir.mkdir(parents=True, exist_ok=True)
 engine = create_async_engine(settings.database_url)
@@ -169,6 +183,17 @@ async def save_outlets(rows: list[OutletRow]) -> None:
     async with Session() as session:
         for row in rows:
             await session.merge(row)
+        await session.commit()
+
+
+async def load_visual_review(frame_hash: str, model: str) -> VisualReviewRow | None:
+    async with Session() as session:
+        return await session.get(VisualReviewRow, (frame_hash, model))
+
+
+async def save_visual_review(row: VisualReviewRow) -> None:
+    async with Session() as session:
+        await session.merge(row)
         await session.commit()
 
 

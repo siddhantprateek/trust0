@@ -108,6 +108,11 @@ LEAN_INSTRUCTIONS = (
 )
 
 
+# Notes for the report's skipped list when TYPESAFE_API_KEY is set but a Jev call fails
+ON_STORY_UNAVAILABLE = "Jev coverage relevance check unavailable; all candidate articles kept"
+RATE_UNAVAILABLE = "Jev outlet rating unavailable for {count} outlet{s}; the LLM's lean label was used"
+
+
 def _outlet_domain(url: str) -> str | None:
     host = (urlsplit(url).hostname or "").lower()
     return outlets.outlet_key(host) if outlets.is_outlet(host) else None
@@ -123,8 +128,9 @@ async def build(item: Ingested, facts: FactCheckResult, client: httpx.AsyncClien
     claim_sources = [source for claim in facts.claims for source in claim.sources]
     if not facts.news_query:
         domains = {d: s.publisher or d for s in claim_sources if (d := _outlet_domain(s.url))}
-        _tag_claim_sources(claim_sources, await _rate(list(domains), domains))
-        return None, []
+        ratings, skipped = await _rate(list(domains), domains)
+        _tag_claim_sources(claim_sources, ratings)
+        return None, skipped
 
     skipped: list[str] = []
     found: list[dict] = []
@@ -141,7 +147,8 @@ async def build(item: Ingested, facts: FactCheckResult, client: httpx.AsyncClien
         if article["url"] not in seen and _outlet_domain(article["url"]) and len(candidates) < MAX_CANDIDATES:
             seen.add(article["url"])
             candidates.append(article)
-    candidates = await _on_story(item, facts, candidates)
+    candidates, on_story_skipped = await _on_story(item, facts, candidates)
+    skipped += on_story_skipped
     # The checked article is part of the story by definition
     if item.platform == "article" and item.url and _outlet_domain(item.url):
         candidates.insert(0, {"url": item.url, "title": item.title, "outlet": None, "date": None, "subject": True})
@@ -165,7 +172,8 @@ async def build(item: Ingested, facts: FactCheckResult, client: httpx.AsyncClien
     for source in claim_sources:
         if (domain := _outlet_domain(source.url)) and domain not in names:
             names[domain] = source.publisher or domain
-    ratings = await _rate(list(names), names)
+    ratings, rate_skipped = await _rate(list(names), names)
+    skipped += rate_skipped
     for domain, source in by_outlet.items():
         rating = ratings.get(domain, UNRATED)
         source.lean, source.rating, source.lean_confidence = rating.lean, rating.source, rating.confidence
@@ -181,14 +189,15 @@ def _tag_claim_sources(sources: list, ratings: dict[str, Rating]) -> None:
             source.lean = ratings.get(domain, UNRATED).lean
 
 
-async def _on_story(item: Ingested, facts: FactCheckResult, articles: list[dict]) -> list[dict]:
-    """The articles that are news reports on this story, judged by Jev in one request (one Noul per article).
+async def _on_story(item: Ingested, facts: FactCheckResult, articles: list[dict]) -> tuple[list[dict], list[str]]:
+    """The articles that are news reports on this story, judged by Jev in one request (one Noul per article), plus a
+    note when Jev was configured but didn't answer.
 
     A news search for a loose query also returns stock tips, tutorials and other stories that happen to share a
     keyword, and the fact check cites pages that aren't news at all. All articles are kept when Jev isn't available.
     """
     if not articles:
-        return []
+        return [], []
     story = {
         "story": facts.news_query,
         "checked_content": item.title or "",
@@ -202,20 +211,22 @@ async def _on_story(item: Ingested, facts: FactCheckResult, articles: list[dict]
     questions = {f"a{i}": ON_STORY_INSTRUCTIONS.format(index=i) for i in range(len(articles))}
     probabilities = await jev.nouls(story, questions)
     if probabilities is None:
-        return articles
+        return articles, [ON_STORY_UNAVAILABLE] if get_settings().has_jev else []
     kept = [a for i, a in enumerate(articles) if probabilities.get(f"a{i}", 0.0) >= ON_STORY_MIN_PROBABILITY]
     log.info("Coverage: %d of %d articles are on the story", len(kept), len(articles))
-    return kept
+    return kept, []
 
 
-async def _rate(domains: list[str], names: dict[str, str]) -> dict[str, Rating]:
-    """Rating per domain: the curated table first, then cached estimates, then fresh ones.
+async def _rate(domains: list[str], names: dict[str, str]) -> tuple[dict[str, Rating], list[str]]:
+    """Rating per domain (the curated table first, then cached estimates, then fresh ones), plus a note when Jev
+    was configured but failed to rate some outlets.
 
     A fresh estimate is two steps. The LLM researches the outlet (it can search) and writes up what the raters say;
     Jev then rates the lean from that write-up alone and reports how sure it is, and an outlet it isn't sure about
     stays unrated. Without a TypeSafe key, the LLM's own label is used.
     """
     ratings: dict[str, Rating] = {}
+    skipped: list[str] = []
     unknown = []
     for domain in domains:
         if hit := outlets.known(domain):
@@ -245,25 +256,29 @@ async def _rate(domains: list[str], names: dict[str, str]) -> dict[str, Rating]:
                     fresh[domain] = estimate
             decided = await asyncio.gather(*(_decide(domain, e) for domain, e in fresh.items()))
             rows = []
-            for (domain, estimate), (lean, confidence) in zip(fresh.items(), decided):
+            if failed := sum(1 for *_, ok in decided if not ok):
+                skipped.append(RATE_UNAVAILABLE.format(count=failed, s="" if failed == 1 else "s"))
+            for (domain, estimate), (lean, confidence, _) in zip(fresh.items(), decided):
                 ratings[domain] = Rating(estimate.name or None, lean, "estimated" if lean else None, confidence)
                 rows.append(OutletRow(domain=domain, name=estimate.name[:256], lean=lean, lean_confidence=confidence))
             await save_outlets(rows)
-    return ratings
+    return ratings, skipped
 
 
-async def _decide(domain: str, estimate: OutletEstimate) -> tuple[Lean | None, float | None]:
-    """The lean to show and Jev's confidence in it. Falls back to the LLM's label when Jev isn't available."""
+async def _decide(domain: str, estimate: OutletEstimate) -> tuple[Lean | None, float | None, bool]:
+    """The lean to show, Jev's confidence in it, and False when Jev was configured but gave no usable answer.
+    Falls back to the LLM's label when Jev isn't available."""
     if not get_settings().has_jev:
-        return estimate.lean, None
+        return estimate.lean, None, True
     evidence = {"domain": domain, "name": estimate.name or domain, "evidence": estimate.evidence or "No evidence found."}
     answer = await jev.choice(evidence, LEAN_INSTRUCTIONS, LEAN_CHOICES)
     if answer is None or answer.choice not in LEAN_CHOICES:
-        return estimate.lean, None
+        log.warning("Jev gave no lean for %s; using the LLM's label", domain)
+        return estimate.lean, None, False
     if answer.choice == "unrated" or answer.confidence < get_settings().jev_min_confidence:
         log.info("Leaving %s unrated (Jev: %s, confidence %.2f)", domain, answer.choice, answer.confidence)
-        return None, answer.confidence
-    return answer.choice, answer.confidence
+        return None, answer.confidence, True
+    return answer.choice, answer.confidence, True
 
 
 def _summarise(query: str, sources: list[CoverageSource], subject_domain: str | None, ratings: dict[str, Rating]) -> Coverage:

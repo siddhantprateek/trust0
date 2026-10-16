@@ -99,7 +99,10 @@ async def _run(job: Job, progress: Progress) -> None:
         else:
             await progress.skip("media", "No image or video to fingerprint")
 
-        trace, (detectors, ai_review) = await asyncio.gather(_trace(job, item, hashes, crops, client, progress), _detect_ai(frames, client, progress))
+        trace, (detectors, review, review_skipped) = await asyncio.gather(
+            _trace(job, item, hashes, crops, client, progress), _detect_ai(frames, client, progress, hashes[0] if hashes else None)
+        )
+        ai_review = review.mean if review else None
         ai_probability = sum(detectors.values()) / len(detectors) if detectors else None
 
         await progress.start("factcheck", "Picking the claims that matter")
@@ -119,7 +122,8 @@ async def _run(job: Job, progress: Progress) -> None:
 
     # The media is the subject for posts, videos, uploads and images picked by URL; an article's header image is incidental
     has_media = bool(hashes) and bool(job.media_url or job.upload_path or item.platform not in ("article", "text"))
-    skipped = item.notes + trace.skipped + facts.skipped + coverage_skipped
+    # The review's note is about the media verdict, so it's only worth showing when the media is the subject
+    skipped = item.notes + trace.skipped + (review_skipped if has_media else []) + facts.skipped + coverage_skipped
     if has_media and not settings.has_ai_detector:
         skipped.append("AI-generation detection (no t0-vision model or Hive key)")
 
@@ -177,6 +181,8 @@ async def _run(job: Job, progress: Progress) -> None:
         ai_generated_probability=ai_probability,
         ai_detectors=detectors,
         ai_review=ai_review,
+        ai_review_frames=review.frames if review else [],
+        ai_review_model=review.model if review else None,
         c2pa=embedded,
         originality=trace.originality,
         origin_url=trace.origin_url,
@@ -265,24 +271,27 @@ async def _trace(
     return trace
 
 
-async def _detect_ai(frames: list[Path], client: httpx.AsyncClient, progress: Progress) -> tuple[dict[str, float], float | None]:
-    """AI-generated probability from each configured detector (the report uses their mean), and Jev's visual review."""
+async def _detect_ai(
+    frames: list[Path], client: httpx.AsyncClient, progress: Progress, first_hash: str | None = None
+) -> tuple[dict[str, float], visual_review.Review | None, list[str]]:
+    """AI-generated probability from each configured detector (the report uses their mean), Jev's visual review, and
+    a note when the review was expected but Jev didn't answer. `first_hash` lets re-uploads reuse a stored review."""
     if not frames:
         await progress.skip("ai", "No image or video to scan")
-        return {}, None
+        return {}, None, []
     await progress.start("ai", f"Scanning {_plural(len(frames), 'frame')}")
     names = ("t0-vision", "hive")
-    *scores, review = await asyncio.gather(
-        local_models.ai_generated_score(frames), external.ai_generated_score(frames, client), visual_review.ai_review(frames)
+    *scores, (review, notes) = await asyncio.gather(
+        local_models.ai_generated_score(frames), external.ai_generated_score(frames, client), visual_review.ai_review(frames, first_hash)
     )
     detectors = {name: round(score, 4) for name, score in zip(names, scores) if score is not None}
     if detectors:
         mean = sum(detectors.values()) / len(detectors)
-        reviewed = f" · visual review {round(review * 100)}%" if review is not None else ""
+        reviewed = f" · visual review {round(review.mean * 100)}%" if review is not None else ""
         await progress.complete("ai", f"{round(mean * 100)}% likely AI-generated · {', '.join(detectors)}{reviewed}")
     else:
         await progress.skip("ai", "No detector configured")
-    return detectors, review
+    return detectors, review, notes
 
 
 def _describe(item: ingest.Ingested) -> str:
