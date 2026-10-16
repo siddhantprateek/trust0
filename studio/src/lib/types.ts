@@ -50,7 +50,7 @@ export type CoverageSource = {
   lean: Lean | null
   // 'table': curated rating; 'estimated': the model's estimate for an outlet missing from the table
   rating: 'table' | 'estimated' | null
-  // The decision model's confidence (0-1) in an estimated lean; missing on curated ratings and older reports
+  // Jev's confidence (0-1) in an estimated lean; missing on curated ratings and older reports
   leanConfidence?: number | null
 }
 
@@ -79,6 +79,8 @@ export type Claim = {
 export type Signals = {
   aiGeneratedProbability: number | null
   aiDetectors: Record<string, number>
+  // Jev's visual review of the keyframes: mean probability they're AI-generated. Missing on older reports
+  aiReview?: number | null
   c2pa: string | null
   originality: 'original' | 'reupload' | 'modified-reupload' | 'unknown'
   originUrl: string | null

@@ -70,6 +70,9 @@ class Signals(BaseModel):
     ai_generated_probability: float | None = Field(default=None, serialization_alias="aiGeneratedProbability")
     # Each detector's score, e.g. {"t0-vision": 0.12, "hive": 0.08}; ai_generated_probability is their mean
     ai_detectors: dict[str, float] = Field(default={}, serialization_alias="aiDetectors")
+    # Jev's visual review of the keyframes: mean probability that they're AI-generated. A second opinion the
+    # verdict checks the detectors against, not a detector itself, so it isn't part of ai_generated_probability
+    ai_review: float | None = Field(default=None, serialization_alias="aiReview")
     c2pa: str | None = None  # "ai-generated" | "camera-capture" | "edited" | "none"
     originality: Literal["original", "reupload", "modified-reupload", "unknown"] = "unknown"
     origin_url: str | None = Field(default=None, serialization_alias="originUrl")
@@ -141,7 +144,7 @@ class CoverageSource(BaseModel):
     lean: Lean | None = None
     # "table": from the curated ratings in pipeline/outlets.py. "estimated": researched by the LLM, cached per outlet
     rating: Literal["table", "estimated"] | None = None
-    # How sure the decision model was of an estimated lean, 0-1. None for curated ratings and estimates made without it
+    # Jev's confidence in an estimated lean, 0-1. None for curated ratings and estimates made without Jev
     lean_confidence: float | None = Field(default=None, serialization_alias="leanConfidence")
 
     model_config = {"populate_by_name": True}

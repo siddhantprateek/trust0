@@ -52,7 +52,7 @@ class OutletRow(Base):
     name: Mapped[str] = mapped_column(String(256), default="")
     # Null when the outlet isn't a partisan news source or couldn't be rated
     lean: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    # The decision model's confidence in its answer, when it made the call
+    # Jev's confidence in its answer, when Jev made the call
     lean_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

@@ -54,6 +54,38 @@ def test_embedded_ai_marker_drives_likely_ai():
     assert _media(embedded="ai-generated").verdict == "likely-ai"
 
 
+def test_one_detector_just_over_the_line_is_not_enough():
+    # The misty landscape reel: t0-vision 0.72, nothing else
+    result = _media(ai_probability=0.72, detectors={"t0-vision": 0.72}, originality="original")
+    assert result.verdict == "unverified"
+    assert any("no second signal" in c.label for c in result.checks)
+
+
+def test_visual_review_agreeing_makes_it_likely_ai():
+    result = _media(ai_probability=0.72, detectors={"t0-vision": 0.72}, ai_review=0.66)
+    assert result.verdict == "likely-ai"
+    assert any(c.label.startswith("Visual review agrees") for c in result.checks)
+
+
+def test_visual_review_disagreeing_keeps_it_unverified():
+    # Even a very sure detector can't call it AI when the review says camera footage
+    result = _media(ai_probability=0.97, detectors={"t0-vision": 0.97}, ai_review=0.2, originality="original")
+    assert result.verdict == "unverified"
+    assert any("looks like camera footage" in c.label for c in result.checks)
+
+
+def test_two_detectors_agreeing_make_it_likely_ai():
+    assert _media(ai_probability=0.8, detectors={"t0-vision": 0.75, "hive": 0.85}).verdict == "likely-ai"
+
+
+def test_visual_review_alone_never_flags_media():
+    # A clean detector plus a review leaning AI is unverified, not likely-ai and not authentic
+    result = _media(ai_probability=0.05, detectors={"t0-vision": 0.05}, ai_review=0.7, originality="original")
+    assert result.verdict == "unverified"
+    clean = _media(ai_probability=0.05, detectors={"t0-vision": 0.05}, ai_review=0.1, originality="original")
+    assert clean.verdict == "authentic"
+
+
 def test_untraced_media_without_detector_is_not_called_authentic():
     assert _media(originality="original").verdict == "unverified"
 
@@ -249,14 +281,19 @@ def test_detector_scores_are_averaged_into_one_probability(monkeypatch):
         async def skip(self, step_id, detail):
             self.events.append(("skip", step_id, detail))
 
+    async def review(frames):
+        return 0.25
+
     monkeypatch.setattr(local_models, "ai_generated_score", t0)
     monkeypatch.setattr(external, "ai_generated_score", hive)
+    monkeypatch.setattr(runner.visual_review, "ai_review", review)
     progress = RecordingProgress()
-    assert asyncio.run(runner._detect_ai([Path("x.jpg")], None, progress)) == {"t0-vision": 0.9, "hive": 0.5}
-    assert progress.events[-1] == ("complete", "ai", "70% likely AI-generated · t0-vision, hive")
+    # The visual review is returned beside the detectors, not averaged into them
+    assert asyncio.run(runner._detect_ai([Path("x.jpg")], None, progress)) == ({"t0-vision": 0.9, "hive": 0.5}, 0.25)
+    assert progress.events[-1] == ("complete", "ai", "70% likely AI-generated · t0-vision, hive · visual review 25%")
 
     skipped = RecordingProgress()
-    assert asyncio.run(runner._detect_ai([], None, skipped)) == {}
+    assert asyncio.run(runner._detect_ai([], None, skipped)) == ({}, None)
     assert skipped.events == [("skip", "ai", "No image or video to scan")]
 
 

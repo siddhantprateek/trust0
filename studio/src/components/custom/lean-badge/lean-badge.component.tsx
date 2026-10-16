@@ -11,7 +11,7 @@ const sideStyles = {
 type LeanBadgeProps = {
   lean: Lean | null | undefined
   estimated?: boolean
-  // The decision model's confidence in an estimated lean, 0-1
+  // Jev's confidence in an estimated lean, 0-1
   confidence?: number | null
   className?: string
 }
@@ -19,7 +19,7 @@ type LeanBadgeProps = {
 function estimateTitle(confidence: number | null | undefined) {
   const base = 'Estimated rating: this outlet is not in the curated ratings table'
   if (confidence == null) return base
-  return `${base}. Rated from the raters' published ratings, confidence ${Math.round(confidence * 100)}%`
+  return `${base}. Rated by Jev from the raters' published ratings, confidence ${Math.round(confidence * 100)}%`
 }
 
 /** An outlet's political lean, colored by its side of the Left / Center / Right bar. */

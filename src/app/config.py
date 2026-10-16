@@ -33,11 +33,16 @@ class Settings(BaseSettings):
     hive_api_key: str = ""
     ytdlp_cookies_file: str = ""
 
-    # OpenAI's Decisions API turns the LLM's research on an unknown outlet into a calibrated lean rating. Uses
-    # OPENAI_API_KEY whatever LLM_PROVIDER is; without it, the LLM's own label is used.
-    decision_model: str = "gpt-6-luna"
-    # Below this confidence the outlet stays unrated: a wrong lean is worse than none
-    decision_min_confidence: float = 0.5
+    # Jev (TypeSafe's System One model): outlet lean from the LLM's research, which search results are on the story,
+    # and a visual second opinion on AI-generated media. Without a key, each step falls back to its old behaviour.
+    # https://docs.typesafe.ai
+    typesafe_api_key: str = ""
+    # jev-preview is Jev 1.14; images work on 1.13+ but are a preview feature
+    jev_model: str = "jev-preview"
+    # Below this confidence an outlet stays unrated: a wrong lean is worse than none
+    jev_min_confidence: float = 0.5
+    # Send keyframes to Jev's image models for a second opinion on AI generation
+    jev_visual_review: bool = True
 
     # Models that run on this machine; need the [local] extra (torch + transformers)
     # t0-vision: our fine-tuned AI-image detector (experiments/ai-detect). A checkpoint folder, e.g. C:/trust0-data/checkpoints/t0-vision/best
@@ -83,8 +88,8 @@ class Settings(BaseSettings):
         return bool(self.openrouter_api_key and self.openrouter_model)
 
     @property
-    def has_decisions(self) -> bool:
-        return bool(self.openai_api_key and self.decision_model)
+    def has_jev(self) -> bool:
+        return bool(self.typesafe_api_key)
 
     @property
     def has_local_detector(self) -> bool:

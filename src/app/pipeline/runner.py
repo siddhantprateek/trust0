@@ -12,7 +12,7 @@ import httpx
 
 from app.config import get_settings
 from app.db import load_report, save_report
-from app.pipeline import coverage, factcheck, ingest, media, provenance, scoring
+from app.pipeline import coverage, factcheck, ingest, media, provenance, scoring, visual_review
 from app.pipeline.progress import Progress
 from app.schemas import Preview, ReportSection, Signals
 from app.services import external, local_models
@@ -99,7 +99,7 @@ async def _run(job: Job, progress: Progress) -> None:
         else:
             await progress.skip("media", "No image or video to fingerprint")
 
-        trace, detectors = await asyncio.gather(_trace(job, item, hashes, crops, client, progress), _detect_ai(frames, client, progress))
+        trace, (detectors, ai_review) = await asyncio.gather(_trace(job, item, hashes, crops, client, progress), _detect_ai(frames, client, progress))
         ai_probability = sum(detectors.values()) / len(detectors) if detectors else None
 
         await progress.start("factcheck", "Picking the claims that matter")
@@ -133,6 +133,8 @@ async def _run(job: Job, progress: Progress) -> None:
         has_origin=bool(trace.origin_url),
         modifications=trace.modifications,
         claims=facts.claims,
+        detectors=detectors,
+        ai_review=ai_review,
     )
 
     # A post with both a caption and a picture or video gets a verdict for each; one can be true while the other isn't
@@ -145,6 +147,8 @@ async def _run(job: Job, progress: Progress) -> None:
             visual_matches=trace.visual_matches,
             modifications=trace.modifications,
             has_origin=bool(trace.origin_url),
+            detectors=detectors,
+            ai_review=ai_review,
         )
         text_part = scoring.assess_text(facts.claims)
         sections = [
@@ -172,6 +176,7 @@ async def _run(job: Job, progress: Progress) -> None:
     report.signals = Signals(
         ai_generated_probability=ai_probability,
         ai_detectors=detectors,
+        ai_review=ai_review,
         c2pa=embedded,
         originality=trace.originality,
         origin_url=trace.origin_url,
@@ -260,21 +265,24 @@ async def _trace(
     return trace
 
 
-async def _detect_ai(frames: list[Path], client: httpx.AsyncClient, progress: Progress) -> dict[str, float]:
-    """AI-generated probability from each configured detector. The report uses their mean."""
+async def _detect_ai(frames: list[Path], client: httpx.AsyncClient, progress: Progress) -> tuple[dict[str, float], float | None]:
+    """AI-generated probability from each configured detector (the report uses their mean), and Jev's visual review."""
     if not frames:
         await progress.skip("ai", "No image or video to scan")
-        return {}
+        return {}, None
     await progress.start("ai", f"Scanning {_plural(len(frames), 'frame')}")
     names = ("t0-vision", "hive")
-    scores = await asyncio.gather(local_models.ai_generated_score(frames), external.ai_generated_score(frames, client))
+    *scores, review = await asyncio.gather(
+        local_models.ai_generated_score(frames), external.ai_generated_score(frames, client), visual_review.ai_review(frames)
+    )
     detectors = {name: round(score, 4) for name, score in zip(names, scores) if score is not None}
     if detectors:
         mean = sum(detectors.values()) / len(detectors)
-        await progress.complete("ai", f"{round(mean * 100)}% likely AI-generated · {', '.join(detectors)}")
+        reviewed = f" · visual review {round(review * 100)}%" if review is not None else ""
+        await progress.complete("ai", f"{round(mean * 100)}% likely AI-generated · {', '.join(detectors)}{reviewed}")
     else:
         await progress.skip("ai", "No detector configured")
-    return detectors
+    return detectors, review
 
 
 def _describe(item: ingest.Ingested) -> str:

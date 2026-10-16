@@ -2,17 +2,14 @@ import asyncio
 import json
 import os
 import tempfile
-from types import SimpleNamespace
 
 import httpx
-import openai
-from openai.types import Decision
 
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="trust0-test-"))
 
 from app.db import init_db  # noqa: E402
 from app.pipeline import coverage, outlets  # noqa: E402
-from app.services import decisions  # noqa: E402
+from app.services import jev  # noqa: E402
 from app.pipeline.factcheck import FactCheckResult  # noqa: E402
 from app.pipeline.ingest import Ingested  # noqa: E402
 from app.schemas import Claim, SourceRef  # noqa: E402
@@ -37,13 +34,13 @@ def test_percentages_always_sum_to_100():
     assert coverage._percentages([0, 3, 0]) == (0, 100, 0)
 
 
-def _run(monkeypatch, articles, claims=(), query="flood in valencia", item=None, estimates=None, decision=..., decision_calls=None, on_story=None, on_story_calls=None):
-    """decision: what the Decisions API returns for a lean (a decisions.Choice, or None for a failed call); left out,
-    it isn't configured. on_story: probabilities by question name for the relevance check; None keeps every article."""
+def _run(monkeypatch, articles, claims=(), query="flood in valencia", item=None, estimates=None, jev_answer=..., jev_calls=None, on_story=None, on_story_calls=None):
+    """jev_answer: Jev's lean answer (a jev.Choice, or None for a failed call); left out, Jev isn't configured.
+    on_story: probabilities by question name for the relevance check; None keeps every article."""
 
-    async def fake_predicates(input, questions):
+    async def fake_nouls(state, questions):
         if on_story_calls is not None:
-            on_story_calls.append((input, questions))
+            on_story_calls.append((state, questions))
         return on_story
 
     async def fake_news(q, client):
@@ -52,18 +49,18 @@ def _run(monkeypatch, articles, claims=(), query="flood in valencia", item=None,
     async def fake_research(**kwargs):
         return estimates
 
-    async def fake_choice(input, instructions, choices):
-        if decision_calls is not None:
-            decision_calls.append(input)
-        return decision
+    async def fake_choice(state, instructions, criteria, assets=None):
+        if jev_calls is not None:
+            jev_calls.append(state)
+        return jev_answer
 
     monkeypatch.setattr(coverage.external, "search_news", fake_news)
     monkeypatch.setattr(coverage.llm, "research", fake_research)
-    monkeypatch.setattr(coverage.decisions, "choice", fake_choice)
-    monkeypatch.setattr(coverage.decisions, "predicates", fake_predicates)
+    monkeypatch.setattr(coverage.jev, "choice", fake_choice)
+    monkeypatch.setattr(coverage.jev, "nouls", fake_nouls)
     monkeypatch.setattr(coverage.get_settings(), "serpapi_api_key", "test")
     monkeypatch.setattr(type(coverage.get_settings()), "has_llm", property(lambda self: True))
-    monkeypatch.setattr(type(coverage.get_settings()), "has_decisions", property(lambda self: decision is not ...))
+    monkeypatch.setattr(type(coverage.get_settings()), "has_jev", property(lambda self: jev_answer is not ...))
     facts = FactCheckResult(claims=list(claims), summary="", news_query=query)
 
     async def go():
@@ -120,93 +117,107 @@ def _estimate(domain, lean="lean-left", evidence="AllSides rates it Lean Left; M
     return coverage.OutletEstimates(outlets=[coverage.OutletEstimate(domain=domain, name="Some Paper", lean=lean, evidence=evidence)])
 
 
-def test_decision_model_rates_the_lean_from_the_llms_evidence(monkeypatch):
+def test_jev_rates_the_lean_from_the_llms_evidence(monkeypatch):
     calls = []
-    answer = decisions.Choice(choice="lean-left", probabilities={"lean-left": 0.9, "left": 0.1}, confidence=0.88)
-    story, _ = _run(monkeypatch, [_article("decided.example")], estimates=_estimate("decided.example", lean="center"), decision=answer, decision_calls=calls)
+    answer = jev.Choice(choice="lean-left", probabilities={"lean-left": 0.9, "left": 0.1}, confidence=0.88)
+    story, _ = _run(monkeypatch, [_article("decided.example")], estimates=_estimate("decided.example", lean="center"), jev_answer=answer, jev_calls=calls)
     source = story.sources[0]
     assert (source.lean, source.rating, source.lean_confidence) == ("lean-left", "estimated", 0.88)
-    # The decision model judges the write-up on its own: the LLM's label isn't in its input
+    # Jev judges the write-up on its own: the LLM's label isn't in the state
     assert calls == [{"domain": "decided.example", "name": "Some Paper", "evidence": _estimate("x").outlets[0].evidence}]
     # Cached with its confidence, so a later check shows the same thing without asking again
-    story, _ = _run(monkeypatch, [_article("decided.example")], decision=None, decision_calls=calls)
+    story, _ = _run(monkeypatch, [_article("decided.example")], jev_answer=None, jev_calls=calls)
     assert (story.sources[0].lean, story.sources[0].lean_confidence) == ("lean-left", 0.88)
     assert len(calls) == 1
 
 
-def test_outlet_stays_unrated_when_the_decision_is_unsure(monkeypatch):
-    answer = decisions.Choice(choice="right", probabilities={"right": 0.4, "lean-right": 0.35, "center": 0.25}, confidence=0.28)
-    story, _ = _run(monkeypatch, [_article("unsure.example")], estimates=_estimate("unsure.example", lean="right"), decision=answer)
+def test_outlet_stays_unrated_when_jev_is_unsure(monkeypatch):
+    answer = jev.Choice(choice="right", probabilities={"right": 0.4, "lean-right": 0.35, "center": 0.25}, confidence=0.28)
+    story, _ = _run(monkeypatch, [_article("unsure.example")], estimates=_estimate("unsure.example", lean="right"), jev_answer=answer)
     source = story.sources[0]
     assert (source.lean, source.rating, source.lean_confidence) == (None, None, 0.28)
     assert story.unrated == 1
 
 
-def test_outlet_stays_unrated_when_the_decision_is_unrated(monkeypatch):
-    answer = decisions.Choice(choice="unrated", probabilities={"unrated": 0.95, "center": 0.05}, confidence=0.94)
-    story, _ = _run(monkeypatch, [_article("norating.example")], estimates=_estimate("norating.example", evidence="No rater covers it."), decision=answer)
+def test_outlet_stays_unrated_when_jev_picks_unrated(monkeypatch):
+    answer = jev.Choice(choice="unrated", probabilities={"unrated": 0.95, "center": 0.05}, confidence=0.94)
+    story, _ = _run(monkeypatch, [_article("norating.example")], estimates=_estimate("norating.example", evidence="No rater covers it."), jev_answer=answer)
     assert story.sources[0].lean is None
 
 
-def test_llm_label_is_used_when_the_decision_fails(monkeypatch):
-    story, _ = _run(monkeypatch, [_article("decisiondown.example")], estimates=_estimate("decisiondown.example", lean="lean-right"), decision=None)
+def test_llm_label_is_used_when_jev_fails(monkeypatch):
+    story, _ = _run(monkeypatch, [_article("jevdown.example")], estimates=_estimate("jevdown.example", lean="lean-right"), jev_answer=None)
     source = story.sources[0]
     assert (source.lean, source.rating, source.lean_confidence) == ("lean-right", "estimated", None)
 
 
-def _fake_client(monkeypatch, result):
-    """Swap the OpenAI client for one whose decisions.create returns (or raises) `result` and records its arguments."""
+def _mock_jev(monkeypatch, *responses):
+    """Point jev.ask at a mock transport answering with `responses` in turn; returns the requests it saw."""
     sent = []
+    replies = iter(responses)
 
-    async def create(**kwargs):
-        sent.append(kwargs)
-        if isinstance(result, Exception):
-            raise result
-        return result
+    def handler(request):
+        sent.append(request)
+        return next(replies)
 
-    monkeypatch.setattr(decisions, "_client", lambda: SimpleNamespace(decisions=SimpleNamespace(create=create)))
-    monkeypatch.setattr(decisions.get_settings(), "openai_api_key", "sk-test")
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(jev.httpx, "AsyncClient", lambda **kw: real_client(transport=httpx.MockTransport(handler)))
+    monkeypatch.setattr(jev.get_settings(), "typesafe_api_key", "ts_test")
+
+    async def no_sleep(_):
+        pass
+
+    monkeypatch.setattr(jev.asyncio, "sleep", no_sleep)
     return sent
 
 
-def test_decisions_client_sends_a_choice_question_and_reads_the_answer(monkeypatch):
-    sent = _fake_client(monkeypatch, Decision.model_validate({
-        "model": "gpt-6-luna",
-        "answers": [{
-            "type": "choice",
-            "name": "answer",
-            "choice": "center",
-            "probabilities": [{"value": "center", "probability": 0.8}, {"value": "unrated", "probability": 0.2}],
-            "confidence": 0.73,
-        }],
-        "usage": {"input_tokens": 120, "input_tokens_details": {"cache_write_tokens": 0, "cached_tokens": 0}, "output_tokens": 0, "output_tokens_details": {"reasoning_tokens": 0}, "total_tokens": 120},
-    }))
-    answer = asyncio.run(decisions.choice({"evidence": "x"}, "Which?", {"center": "Middle", "unrated": "No rating"}))
-    assert answer == decisions.Choice(choice="center", probabilities={"center": 0.8, "unrated": 0.2}, confidence=0.73)
+def _answers(answers):
+    return httpx.Response(200, json={"model": "jev-1.14.0", "answers": answers, "usage": {"input_tokens": 120, "output_tokens": 4}})
+
+
+def test_jev_client_retries_when_overloaded_and_reads_a_choice(monkeypatch):
+    sent = _mock_jev(
+        monkeypatch,
+        httpx.Response(529, json={"error": "overloaded"}),
+        _answers({"answer": {"type": "choice", "choice": "center", "probabilities": {"center": 0.8, "unrated": 0.2}, "confidence": 0.73}}),
+    )
+    answer = asyncio.run(jev.choice({"evidence": "x"}, "Which?", {"center": None, "unrated": None}))
+    assert answer == jev.Choice(choice="center", probabilities={"center": 0.8, "unrated": 0.2}, confidence=0.73)
+    assert len(sent) == 2
+    assert sent[0].headers["authorization"] == "Bearer ts_test"
+    assert "typesafe-danger-zone-images" not in sent[0].headers
+
+
+def test_jev_client_gives_up_on_a_bad_key(monkeypatch):
+    _mock_jev(monkeypatch, httpx.Response(401, json={"error": "invalid key"}))
+    assert asyncio.run(jev.choice("state", "Which?", {"a": None})) is None
+
+
+def test_jev_client_asks_nouls_in_one_request(monkeypatch):
+    sent = _mock_jev(monkeypatch, _answers({"a0": {"type": "noul", "noul": 0.94}, "a1": {"type": "noul", "noul": 0.1}}))
+    answers = asyncio.run(jev.nouls({"story": "x"}, {"a0": "First holds", "a1": "Second holds"}))
+    assert answers == {"a0": 0.94, "a1": 0.1}
     (request,) = sent
-    assert request["model"] == "gpt-6-luna"
-    assert json.loads(request["input"]) == {"evidence": "x"}
-    assert request["questions"] == [{
-        "type": "choice",
-        "name": "answer",
-        "instructions": "Which?",
-        "choices": [{"value": "center", "description": "Middle"}, {"value": "unrated", "description": "No rating"}],
-    }]
+    assert json.loads(request.content)["questions"] == {"a0": {"type": "noul", "instructions": "First holds"}, "a1": {"type": "noul", "instructions": "Second holds"}}
 
 
-def test_decisions_client_treats_a_refusal_as_no_answer(monkeypatch):
-    _fake_client(monkeypatch, Decision.model_validate({
-        "model": "gpt-6-luna",
-        "answers": [{"type": "refusal", "name": "answer"}],
-        "usage": {"input_tokens": 50, "input_tokens_details": {"cache_write_tokens": 0, "cached_tokens": 0}, "output_tokens": 0, "output_tokens_details": {"reasoning_tokens": 0}, "total_tokens": 50},
-    }))
-    assert asyncio.run(decisions.choice("state", "Which?", {"a": "A", "b": "B"})) is None
+def test_jev_client_sends_images_as_assets_with_the_preview_header(monkeypatch, tmp_path):
+    from PIL import Image
 
-
-def test_decisions_client_gives_up_on_an_api_error(monkeypatch):
-    request = httpx.Request("POST", "https://api.openai.com/v1/decisions")
-    _fake_client(monkeypatch, openai.AuthenticationError("invalid key", response=httpx.Response(401, request=request), body=None))
-    assert asyncio.run(decisions.choice("state", "Which?", {"a": "A", "b": "B"})) is None
+    frame = tmp_path / "frame.png"
+    Image.new("RGB", (200, 120), "white").save(frame)  # smaller than Jev accepts: gets scaled up
+    ref, asset = jev.image_asset(frame)
+    sent = _mock_jev(monkeypatch, _answers({"answer": {"type": "choice", "choice": "camera", "probabilities": {"camera": 0.9, "ai-generated": 0.1}, "confidence": 0.85}}))
+    answer = asyncio.run(jev.choice({"image": ref}, "How was `image` made?", {"camera": "c", "ai-generated": "a"}, assets={ref: asset}))
+    assert answer.choice == "camera"
+    (request,) = sent
+    body = json.loads(request.content)
+    assert request.headers["typesafe-danger-zone-images"] == "true"
+    assert body["state"] == {"image": ref} and set(body["assets"]) == {ref}
+    assert body["assets"][ref]["format"] == "jpg" and "data:" not in body["assets"][ref]["data_base64"]
+    import base64, io
+    with Image.open(io.BytesIO(base64.b64decode(body["assets"][ref]["data_base64"]))) as sent_image:
+        assert min(sent_image.size) >= jev.MIN_SIDE and max(sent_image.size) <= jev.MAX_SIDE
 
 
 def test_no_coverage_when_only_the_claim_sources_are_news_outlets(monkeypatch):
@@ -225,35 +236,17 @@ def test_articles_off_the_story_are_dropped(monkeypatch):
     on_story = {"a0": 0.97, "a1": 0.02, "a2": 0.9, "a3": 0.1}
     story, _ = _run(monkeypatch, articles, claims=[claim], on_story=on_story, on_story_calls=calls)
     assert [s.domain for s in story.sources] == ["cnn.com", "foxnews.com"]
-    (input, questions), = calls
-    assert input["story"] == "flood in valencia"
-    assert [a["id"] for a in input["articles"]] == ["a0", "a1", "a2", "a3"]
-    assert "`a1`" in questions["a1"]
+    (state, questions), = calls
+    assert state["story"] == "flood in valencia"
+    assert [a["url"] for a in state["articles"]][1] == "https://www.coursera.org/story"
+    # Each question points at its article by state path
+    assert "`articles[1]`" in questions["a1"]
 
 
 def test_checked_article_is_kept_even_if_nothing_else_is_on_the_story(monkeypatch):
     item = Ingested(platform="article", url="https://www.theguardian.com/world/story", title="Story")
     story, _ = _run(monkeypatch, [_article("coursera.org")], item=item, on_story={"a0": 0.01})
     assert [s.domain for s in story.sources] == ["theguardian.com"]
-
-
-def test_decisions_client_asks_named_predicates_in_one_request(monkeypatch):
-    usage = {"input_tokens": 90, "input_tokens_details": {"cache_write_tokens": 0, "cached_tokens": 0}, "output_tokens": 0, "output_tokens_details": {"reasoning_tokens": 0}, "total_tokens": 90}
-    sent = _fake_client(monkeypatch, Decision.model_validate({
-        "model": "gpt-6-luna",
-        "answers": [
-            {"type": "predicate", "name": "a0", "probability": 0.94},
-            {"type": "refusal", "name": "a1"},
-        ],
-        "usage": usage,
-    }))
-    answers = asyncio.run(decisions.predicates({"story": "x"}, {"a0": "First holds", "a1": "Second holds"}))
-    assert answers == {"a0": 0.94}
-    (request,) = sent
-    assert request["questions"] == [
-        {"type": "predicate", "name": "a0", "instructions": "First holds"},
-        {"type": "predicate", "name": "a1", "instructions": "Second holds"},
-    ]
 
 
 def test_article_reports_its_own_outlets_lean(monkeypatch):
