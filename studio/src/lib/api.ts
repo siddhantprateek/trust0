@@ -1,6 +1,35 @@
 import type { ActiveSite, ApiKey, CheckInput, CreatedApiKey, LinkMeta, ModelInfo, Preview, Report, RunSummary } from '@/lib/types'
 
-export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '')
+const API_URL_OVERRIDE_KEY = 'trust0:api-url-override'
+
+// The build-time default — what API_URL falls back to once the override is cleared
+export const DEFAULT_API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '')
+
+export function getApiUrlOverride(): string | null {
+  try {
+    const stored = localStorage.getItem(API_URL_OVERRIDE_KEY)?.trim()
+    return stored || null
+  } catch {
+    return null
+  }
+}
+
+// Pass null (or '') to clear the override and fall back to the build-time default
+export function setApiUrlOverride(url: string | null) {
+  try {
+    const trimmed = url?.trim()
+    if (trimmed) {
+      localStorage.setItem(API_URL_OVERRIDE_KEY, trimmed)
+    } else {
+      localStorage.removeItem(API_URL_OVERRIDE_KEY)
+    }
+  } catch {
+    // localStorage unavailable (private mode, storage disabled, …) — nothing we can do
+  }
+}
+
+// Read once at module load, so switching the override takes effect on the next page load
+export const API_URL = (getApiUrlOverride() ?? DEFAULT_API_URL).replace(/\/+$/, '')
 
 // Fired after a check is started or cancelled, so the background-runs indicator updates without waiting for its next poll
 export const RUNS_CHANGED_EVENT = 'trust0:runs-changed'

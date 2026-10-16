@@ -14,6 +14,7 @@ import {
   SettingsAccountPage,
   SettingsAllowListPage,
   SettingsApiKeysPage,
+  SettingsServerPage,
   SignInPage,
   SignUpPage,
 } from '@/pages'
@@ -65,6 +66,7 @@ export const router = createBrowserRouter([
               { index: true, element: <Navigate to="allow-list" replace /> },
               { path: 'allow-list', element: <SettingsAllowListPage />, handle: { crumb: 'Allow list' } satisfies CrumbHandle },
               { path: 'api-keys', element: <SettingsApiKeysPage />, handle: { crumb: 'API keys' } satisfies CrumbHandle },
+              { path: 'server', element: <SettingsServerPage />, handle: { crumb: 'Server' } satisfies CrumbHandle },
               // Clerk needs the full subtree (security tab, verification steps, …)
               { path: 'account/*', element: <SettingsAccountPage />, handle: { crumb: 'Account' } satisfies CrumbHandle },
             ],
