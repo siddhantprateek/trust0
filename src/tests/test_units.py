@@ -281,19 +281,24 @@ def test_detector_scores_are_averaged_into_one_probability(monkeypatch):
         async def skip(self, step_id, detail):
             self.events.append(("skip", step_id, detail))
 
-    async def review(frames):
-        return 0.25
+    review_result = runner.visual_review.Review(0.25, [0.2, 0.3], "jev-1.14.0")
+    seen_keys = []
+
+    async def review(frames, key=None):
+        seen_keys.append(key)
+        return review_result, []
 
     monkeypatch.setattr(local_models, "ai_generated_score", t0)
     monkeypatch.setattr(external, "ai_generated_score", hive)
     monkeypatch.setattr(runner.visual_review, "ai_review", review)
     progress = RecordingProgress()
     # The visual review is returned beside the detectors, not averaged into them
-    assert asyncio.run(runner._detect_ai([Path("x.jpg")], None, progress)) == ({"t0-vision": 0.9, "hive": 0.5}, 0.25)
+    assert asyncio.run(runner._detect_ai([Path("x.jpg")], None, progress, "c3d4")) == ({"t0-vision": 0.9, "hive": 0.5}, review_result, [])
+    assert seen_keys == ["c3d4"]  # the first keyframe's hash, so a re-upload can reuse the review
     assert progress.events[-1] == ("complete", "ai", "70% likely AI-generated · t0-vision, hive · visual review 25%")
 
     skipped = RecordingProgress()
-    assert asyncio.run(runner._detect_ai([], None, skipped)) == ({}, None)
+    assert asyncio.run(runner._detect_ai([], None, skipped)) == ({}, None, [])
     assert skipped.events == [("skip", "ai", "No image or video to scan")]
 
 

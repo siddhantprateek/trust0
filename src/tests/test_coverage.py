@@ -259,3 +259,27 @@ def test_article_reports_its_own_outlets_lean(monkeypatch):
 def test_no_coverage_for_content_that_isnt_news(monkeypatch):
     story, _ = _run(monkeypatch, [], query="")
     assert story is None
+
+
+def test_failed_jev_calls_are_noted_in_skipped(monkeypatch):
+    # TYPESAFE_API_KEY set, but both the relevance check and the lean call fail: each falls back and says so
+    story, skipped = _run(monkeypatch, [_article("jevfails.example")], estimates=_estimate("jevfails.example", lean="lean-right"), jev_answer=None)
+    assert story.sources[0].lean == "lean-right"
+    assert coverage.ON_STORY_UNAVAILABLE in skipped
+    assert "Jev outlet rating unavailable for 1 outlet; the LLM's lean label was used" in skipped
+
+
+def test_no_jev_notes_without_a_key_or_when_jev_answers(monkeypatch):
+    _, skipped = _run(monkeypatch, [_article("nokey.example")], estimates=_estimate("nokey.example", lean="center"))
+    assert skipped == []
+    answer = jev.Choice(choice="center", probabilities={"center": 0.9}, confidence=0.8)
+    _, skipped = _run(monkeypatch, [_article("answered.example")], estimates=_estimate("answered.example"), jev_answer=answer, on_story={"a0": 0.9})
+    assert skipped == []
+
+
+def test_failed_lean_call_is_noted_even_without_a_news_story(monkeypatch):
+    claim = Claim(text="c", verdict="supported", explanation="e", sources=[SourceRef(title="t", url="https://www.claimpaper.example/a", publisher="Paper")])
+    story, skipped = _run(monkeypatch, [], claims=[claim], query="", estimates=_estimate("claimpaper.example", lean="left"), jev_answer=None)
+    assert story is None
+    assert skipped == ["Jev outlet rating unavailable for 1 outlet; the LLM's lean label was used"]
+

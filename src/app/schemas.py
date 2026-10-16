@@ -73,6 +73,10 @@ class Signals(BaseModel):
     # Jev's visual review of the keyframes: mean probability that they're AI-generated. A second opinion the
     # verdict checks the detectors against, not a detector itself, so it isn't part of ai_generated_probability
     ai_review: float | None = Field(default=None, serialization_alias="aiReview")
+    # The raw answers behind ai_review: P(ai-generated) for each reviewed frame, and the Jev version that gave them,
+    # kept so the review's thresholds can be recalibrated on real reports later
+    ai_review_frames: list[float] = Field(default=[], serialization_alias="aiReviewFrames")
+    ai_review_model: str | None = Field(default=None, serialization_alias="aiReviewModel")
     c2pa: str | None = None  # "ai-generated" | "camera-capture" | "edited" | "none"
     originality: Literal["original", "reupload", "modified-reupload", "unknown"] = "unknown"
     origin_url: str | None = Field(default=None, serialization_alias="originUrl")

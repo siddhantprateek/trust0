@@ -37,8 +37,9 @@ class Settings(BaseSettings):
     # and a visual second opinion on AI-generated media. Without a key, each step falls back to its old behaviour.
     # https://docs.typesafe.ai
     typesafe_api_key: str = ""
-    # jev-preview is Jev 1.14; images work on 1.13+ but are a preview feature
-    jev_model: str = "jev-preview"
+    # Pinned so answers (and the thresholds tuned on them) don't shift when TypeSafe moves the jev-preview alias.
+    # Images work on 1.13+ but are a preview feature
+    jev_model: str = "jev-1.14.0"
     # Below this confidence an outlet stays unrated: a wrong lean is worse than none
     jev_min_confidence: float = 0.5
     # Send keyframes to Jev's image models for a second opinion on AI generation
