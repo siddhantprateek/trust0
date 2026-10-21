@@ -2,6 +2,9 @@
 // Replace every [bracketed] value before launch.
 export const site = {
   name: 'trust0',
+  tagline: 'The trust layer for everything you see online.',
+  studioUrl: 'https://studio.trytrust0.online/',
+  githubUrl: 'https://github.com/siddhantprateek/trust0',
   url: '[https://yourdomain.com]',
   legalName: '[Company legal name]',
   address: '[Registered business address]',

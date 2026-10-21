@@ -1,7 +1,7 @@
 import { MotionConfig } from 'motion/react'
-import { ScrollRestoration } from 'react-router-dom'
 import Footer from '@/components/custom/footer/footer.component'
 import Header from '@/components/custom/header/header.component'
+import ScrollManager from '@/components/custom/scroll-manager/scroll-manager.component'
 import PageTransition from '@/components/custom/page-transition/page-transition.component'
 
 export default function RootLayout() {
@@ -12,7 +12,7 @@ export default function RootLayout() {
         <PageTransition />
         <Footer />
       </div>
-      <ScrollRestoration />
+      <ScrollManager />
     </MotionConfig>
   )
 }

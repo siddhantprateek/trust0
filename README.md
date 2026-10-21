@@ -1,6 +1,8 @@
 # trust0
 
-### Know what's real before you share it.
+### The trust layer for everything you see online.
+
+[Open the studio](https://studio.trytrust0.online/) · [GitHub](https://github.com/siddhantprateek/trust0)
 
 AI-generated images, recycled videos and confident-sounding AI answers spread faster than anyone can check them. **trust0 tells you if something can be trusted, where it came from, and why.**
 

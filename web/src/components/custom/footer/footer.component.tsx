@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import Logo from '@/components/custom/logo/logo.component'
+import NavLink from '@/components/custom/nav-link/nav-link.component'
 import { Button } from '@/components/ui/button'
+import { site } from '@/config/site'
 
 const columns = [
   {
@@ -15,6 +17,7 @@ const columns = [
   {
     title: 'Resources',
     links: [
+      { label: 'Blog', href: '/blog' },
       { label: 'FAQ', href: '/#faq' },
       { label: 'Docs', href: '#' },
       { label: 'API', href: '#' },
@@ -37,7 +40,7 @@ const socials = [
   },
   {
     label: 'GitHub',
-    href: '#',
+    href: site.githubUrl,
     path: 'M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 2.9.8.1-.6.4-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2Z',
   },
   {
@@ -61,6 +64,7 @@ export default function Footer() {
                   key={social.label}
                   href={social.href}
                   aria-label={social.label}
+                  {...(social.href.startsWith('http') ? { target: '_blank', rel: 'noreferrer' } : {})}
                   className="grid size-8 place-items-center rounded-md bg-foreground/5 transition-colors hover:bg-[#c4a1f2] hover:text-black"
                 >
                   <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
@@ -77,9 +81,9 @@ export default function Footer() {
               <ul className="mt-3 space-y-1.5">
                 {column.links.map((link) => (
                   <li key={link.label}>
-                    <a href={link.href} className="text-sm font-medium transition-colors hover:text-[#9b6fe0]">
+                    <NavLink href={link.href} className="text-sm font-medium transition-colors hover:text-[#9b6fe0]">
                       {link.label}
-                    </a>
+                    </NavLink>
                   </li>
                 ))}
               </ul>
@@ -105,9 +109,14 @@ export default function Footer() {
               Privacy
             </Link>
           </p>
-          <Button size="sm" className="self-start uppercase sm:self-auto" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            Back to top
-          </Button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <Button size="sm" variant="outline" className="uppercase" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+              Back to top
+            </Button>
+            <Button size="sm" asChild className="uppercase">
+              <a href={site.studioUrl}>Get started</a>
+            </Button>
+          </div>
         </div>
       </div>
     </footer>

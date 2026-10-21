@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, useMotionValueEvent, useScroll } from 'motion/react'
 import { Link, useLocation } from 'react-router-dom'
 import Logo from '@/components/custom/logo/logo.component'
+import NavLink from '@/components/custom/nav-link/nav-link.component'
 import { Button } from '@/components/ui/button'
 import {
   NavigationMenu,
@@ -11,6 +12,8 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
 } from '@/components/ui/navigation-menu'
+import { site } from '@/config/site'
+import { useCases } from '@/data/use-cases'
 import { ease } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 
@@ -28,16 +31,12 @@ const menus: { label: string; links: MenuLink[] }[] = [
   },
   {
     label: 'Use cases',
-    links: [
-      { label: 'Journalists & fact-checkers', description: 'Verify footage before it runs.', href: '#' },
-      { label: 'Trust & safety teams', description: 'Triage viral media at scale.', href: '#' },
-      { label: 'Researchers', description: 'Study how content spreads and mutates.', href: '#' },
-      { label: 'Everyday sharing', description: 'Check a forward before you pass it on.', href: '#' },
-    ],
+    links: useCases.map((u) => ({ label: u.label, description: u.blurb, href: `/use-cases/${u.slug}` })),
   },
 ]
 
 const links = [
+  { label: 'Blog', href: '/blog' },
   { label: 'Pricing', href: '/#pricing' },
   { label: 'FAQ', href: '/#faq' },
 ]
@@ -49,13 +48,20 @@ export default function Header() {
   const [pastHero, setPastHero] = useState(false)
 
   // Transparent while the header is over the hero image, solid once it scrolls past it
-  useMotionValueEvent(scrollY, 'change', (y) => {
+  const update = useCallback((y: number) => {
     const hero = document.getElementById('hero')
     const heroBottom = hero ? hero.offsetTop + hero.offsetHeight : 0
     // Bottom edge of the floating bar, including its offset from the top
     const barBottom = headerRef.current?.getBoundingClientRect().bottom ?? 0
     setPastHero(y + barBottom >= heroBottom)
-  })
+  }, [])
+  useMotionValueEvent(scrollY, 'change', update)
+
+  // Also check on load and route change: a restored scroll position doesn't fire a change event
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => update(window.scrollY))
+    return () => cancelAnimationFrame(frame)
+  }, [pathname, update])
 
   const overHero = pathname === '/' && !pastHero
 
@@ -77,7 +83,7 @@ export default function Header() {
       <div
         ref={headerRef}
         className={cn(
-          'pointer-events-auto relative isolate mx-auto flex h-16 max-w-[88rem] items-center justify-between gap-4 rounded-lg border px-5 transition-colors duration-300',
+          'pointer-events-auto relative isolate mx-auto flex h-14 max-w-[88rem] items-center justify-between gap-4 rounded-lg border pr-2 pl-4 transition-colors duration-300',
           // Plain over the hero; becomes the floating bar once it scrolls past
           overHero ? 'border-transparent text-white' : 'border-border text-foreground',
         )}
@@ -92,7 +98,7 @@ export default function Header() {
           )}
         />
         <Link to="/" aria-label="trust0 home">
-          <Logo />
+          <Logo inverted={overHero} />
         </Link>
 
         <NavigationMenu viewport={false} className="hidden md:flex">
@@ -106,10 +112,10 @@ export default function Header() {
                     {menu.links.map((link) => (
                       <li key={link.label}>
                         <NavigationMenuLink asChild>
-                          <a href={link.href} className="flex-col items-start gap-0.5">
+                          <NavLink href={link.href} className="flex-col items-start gap-0.5">
                             <span className="font-medium">{link.label}</span>
                             <span className="text-xs text-muted-foreground">{link.description}</span>
-                          </a>
+                          </NavLink>
                         </NavigationMenuLink>
                       </li>
                     ))}
@@ -120,7 +126,7 @@ export default function Header() {
             {links.map((link) => (
               <NavigationMenuItem key={link.label}>
                 <NavigationMenuLink asChild className={cn('h-9 px-2.5 font-medium', navItemClass)}>
-                  <a href={link.href}>{link.label}</a>
+                  <NavLink href={link.href}>{link.label}</NavLink>
                 </NavigationMenuLink>
               </NavigationMenuItem>
             ))}
@@ -130,12 +136,15 @@ export default function Header() {
         <div className="flex items-center gap-1.5">
           <Button
             variant="ghost"
-            size="sm"
-            className={cn('hidden sm:inline-flex', overHero && 'text-white hover:bg-white/10 hover:text-white')}
+            size="lg"
+            asChild
+            className={cn('hidden px-3 sm:inline-flex', overHero && 'text-white hover:bg-white/10 hover:text-white')}
           >
-            Sign in
+            <a href={site.studioUrl}>Sign in</a>
           </Button>
-          <Button size="sm">Get started</Button>
+          <Button size="lg" asChild className="h-10 rounded-[0.9rem] px-5 font-semibold">
+            <a href={site.studioUrl}>Get started</a>
+          </Button>
         </div>
       </div>
     </motion.header>
