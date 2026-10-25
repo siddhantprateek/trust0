@@ -35,7 +35,9 @@ export default function ReportsTable({ reports }: ReportsTableProps) {
             className="cursor-pointer"
           >
             <TableCell>
-              <p className="font-medium">{report.title}</p>
+              <p className="max-w-md truncate font-medium" title={report.title}>
+                {report.title}
+              </p>
               <p className="max-w-64 truncate font-mono text-xs text-muted-foreground">{report.url}</p>
             </TableCell>
             <TableCell className="text-muted-foreground">{sourceLabel(report)}</TableCell>
