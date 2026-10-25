@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { motion } from 'motion/react'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { fadeUp, stagger } from '@/lib/motion'
 
 export type LegalSection = {
@@ -16,6 +17,7 @@ type LegalPageProps = {
 }
 
 export default function LegalPage({ title, lastRevised, intro, sections }: LegalPageProps) {
+  useDocumentTitle(title, { description: `${title} for trust0, last revised ${lastRevised}.` })
   return (
     <main className="mx-auto max-w-[88rem] px-4 pt-32 pb-24">
       <motion.header variants={stagger} initial="hidden" animate="visible" className="max-w-3xl">

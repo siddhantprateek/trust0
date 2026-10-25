@@ -6,7 +6,10 @@ import { formatDate, posts } from '@/lib/blog'
 import { fadeUp, stagger } from '@/lib/motion'
 
 export default function BlogPage() {
-  useDocumentTitle('Blog')
+  useDocumentTitle('Research and engineering blog', {
+    description: 'How we build, measure and ship the models behind trust0: benchmarks, research and engineering notes.',
+    path: '/blog',
+  })
 
   return (
     <main className="mx-auto max-w-5xl px-4 pt-32 pb-24">

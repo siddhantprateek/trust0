@@ -19,6 +19,7 @@ const columns = [
     links: [
       { label: 'Blog', href: '/blog' },
       { label: 'FAQ', href: '/#faq' },
+      { label: 'Support', href: '/support' },
       { label: 'Docs', href: '#' },
       { label: 'API', href: '#' },
     ],
@@ -107,6 +108,10 @@ export default function Footer() {
             ·{' '}
             <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">
               Privacy
+            </Link>{' '}
+            ·{' '}
+            <Link to="/support" className="underline underline-offset-2 hover:text-foreground">
+              Support
             </Link>
           </p>
           <div className="flex items-center gap-2 self-start sm:self-auto">

@@ -14,7 +14,7 @@ const inView = { initial: 'hidden', whileInView: 'visible', viewport: { once: tr
 export default function UseCasePage() {
   const { slug = '' } = useParams()
   const useCase = getUseCase(slug)
-  useDocumentTitle(useCase?.label)
+  useDocumentTitle(useCase?.label, useCase ? { description: useCase.blurb, path: `/use-cases/${useCase.slug}` } : { noindex: true })
 
   if (!useCase) return <NotFoundPage />
   const Icon = useCase.icon

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { motion, useMotionValueEvent, useScroll } from 'motion/react'
+import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'motion/react'
+import { Menu, X } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import Logo from '@/components/custom/logo/logo.component'
 import NavLink from '@/components/custom/nav-link/nav-link.component'
@@ -37,12 +38,12 @@ const menus: { label: string; links: MenuLink[] }[] = [
 
 const links = [
   { label: 'Blog', href: '/blog' },
-  { label: 'Pricing', href: '/#pricing' },
   { label: 'FAQ', href: '/#faq' },
 ]
 
 export default function Header() {
   const { pathname } = useLocation()
+  const [menuOpen, setMenuOpen] = useState(false)
   const { scrollY } = useScroll()
   const headerRef = useRef<HTMLDivElement>(null)
   const [pastHero, setPastHero] = useState(false)
@@ -63,7 +64,17 @@ export default function Header() {
     return () => cancelAnimationFrame(frame)
   }, [pathname, update])
 
-  const overHero = pathname === '/' && !pastHero
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
+
+  // Following a menu link closes the phone menu
+  const closeMenu = () => setMenuOpen(false)
+
+  const overHero = pathname === '/' && !pastHero && !menuOpen
 
   // Nav items sit on the image while over the hero, so hovers go translucent white
   const navItemClass = cn(
@@ -145,7 +156,64 @@ export default function Header() {
           <Button size="lg" asChild className="h-10 rounded-[0.9rem] px-5 font-semibold">
             <a href={site.studioUrl}>Get started</a>
           </Button>
+          <button
+            type="button"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+            onClick={() => setMenuOpen((open) => !open)}
+            className={cn(
+              'grid size-10 place-items-center rounded-[0.9rem] md:hidden',
+              overHero ? 'text-white hover:bg-white/10' : 'hover:bg-muted',
+            )}
+          >
+            {menuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
         </div>
+
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.nav
+              id="mobile-menu"
+              aria-label="Menu"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-x-0 top-[calc(100%+0.5rem)] max-h-[calc(100svh-6rem)] overflow-y-auto rounded-2xl border bg-background p-3 text-foreground md:hidden"
+            >
+              {menus.map((menu) => (
+                <div key={menu.label} className="pb-2">
+                  <p className="px-3 pt-2 pb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">{menu.label}</p>
+                  <ul>
+                    {menu.links.map((link) => (
+                      <li key={link.label}>
+                        <NavLink href={link.href} onClick={closeMenu} className="flex min-h-11 flex-col justify-center rounded-lg px-3 py-1.5 hover:bg-muted">
+                          <span className="text-sm font-medium">{link.label}</span>
+                          <span className="text-xs text-muted-foreground">{link.description}</span>
+                        </NavLink>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+              <ul className="border-t pt-2">
+                {links.map((link) => (
+                  <li key={link.label}>
+                    <NavLink href={link.href} onClick={closeMenu} className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium hover:bg-muted">
+                      {link.label}
+                    </NavLink>
+                  </li>
+                ))}
+                <li className="sm:hidden">
+                  <a href={site.studioUrl} onClick={closeMenu} className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium hover:bg-muted">
+                    Sign in
+                  </a>
+                </li>
+              </ul>
+            </motion.nav>
+          )}
+        </AnimatePresence>
       </div>
     </motion.header>
   )

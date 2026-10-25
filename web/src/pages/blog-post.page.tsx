@@ -11,7 +11,7 @@ export default function BlogPostPage() {
   const { slug = '' } = useParams()
   const post = getPost(slug)
 
-  useDocumentTitle(post?.title)
+  useDocumentTitle(post?.title, post ? { description: post.description, path: `/blog/${post.slug}`, type: 'article' } : { noindex: true })
 
   if (!post) return <NotFoundPage />
   const toc = headings(post.body)

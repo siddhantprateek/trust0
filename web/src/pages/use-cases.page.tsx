@@ -7,7 +7,10 @@ import { useDocumentTitle } from '@/hooks/use-document-title'
 import { fadeUp, stagger } from '@/lib/motion'
 
 export default function UseCasesPage() {
-  useDocumentTitle('Use cases')
+  useDocumentTitle('Use cases', {
+    description: 'How journalists, trust and safety teams, researchers and everyday sharers use trust0 to check content before it spreads.',
+    path: '/use-cases',
+  })
 
   return (
     <main className="mx-auto max-w-[88rem] px-4 pt-32 pb-24">
