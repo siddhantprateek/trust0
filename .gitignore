@@ -36,3 +36,4 @@ Thumbs.db
 
 # Tooling artifacts
 .claude/settings.local.json
+video/
