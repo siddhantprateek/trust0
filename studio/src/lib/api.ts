@@ -60,8 +60,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
-// Absolute URL for a path the API hands back, e.g. a report's kept media
-export const apiUrl = (path: string) => `${API_URL}${path}`
+// Absolute URL for a path the API hands back, e.g. a report's kept media. Other paths (the bundled demo's
+// media under /sample) are served by the studio itself
+export const apiUrl = (path: string) => (path.startsWith('/v1/') ? `${API_URL}${path}` : path)
 
 // Fill fields an older API (or a report saved before they existed) leaves out, so pages can rely on them
 function normalize(report: Report): Report {

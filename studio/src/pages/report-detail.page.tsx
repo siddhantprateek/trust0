@@ -22,7 +22,7 @@ import { api } from '@/lib/api'
 import { domainFromUrl } from '@/lib/favicon'
 import { formatDate, leanSide, sourceLabel } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import type { ClaimSource, SpreadStep } from '@/lib/types'
+import type { ClaimSource, Report, SpreadStep } from '@/lib/types'
 
 const claimStyles = {
   supported: 'bg-chart-1/15 text-chart-1',
@@ -64,6 +64,11 @@ export default function ReportDetailPage() {
     )
   }
 
+  return <ReportView report={report} />
+}
+
+/** A full report. `backLink` is off for the public demo, which has no report list to go back to. */
+export function ReportView({ report, backLink = true }: { report: Report; backLink?: boolean }) {
   const pending = report.status !== 'complete'
   const detectors = Object.entries(report.signals.aiDetectors)
 
@@ -285,11 +290,13 @@ export default function ReportDetailPage() {
 
       {report.status === 'complete' && report.steps.length > 0 && <ToolTimeline steps={report.steps} defaultOpen={false} />}
 
-      <Button variant="outline" asChild>
-        <Link to="/reports">
-          <ArrowLeft data-icon="inline-start" /> All reports
-        </Link>
-      </Button>
+      {backLink && (
+        <Button variant="outline" asChild>
+          <Link to="/reports">
+            <ArrowLeft data-icon="inline-start" /> All reports
+          </Link>
+        </Button>
+      )}
     </div>
   )
 }

@@ -1,3 +1,4 @@
+export { default as DemoPage } from './demo.page'
 export { default as ModelDetailPage } from './model-detail.page'
 export { default as ModelsPage } from './models.page'
 export { default as NewCheckPage } from './new-check.page'

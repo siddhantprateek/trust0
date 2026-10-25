@@ -1,5 +1,5 @@
 import { SignIn, useAuth } from '@clerk/react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import AuthShell from '@/components/custom/auth-shell/auth-shell.component'
 import { afterAuthPath } from '@/lib/auth-redirect'
 
@@ -14,6 +14,12 @@ export default function SignInPage() {
   return (
     <AuthShell>
       <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" forceRedirectUrl={next} signUpForceRedirectUrl={next} />
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Just looking?{' '}
+        <Link to="/demo" className="font-medium text-primary hover:underline">
+          See a sample report
+        </Link>
+      </p>
     </AuthShell>
   )
 }

@@ -3,6 +3,7 @@ import type { CrumbHandle } from '@/components/custom/site-header/site-header.co
 import DashboardLayout from '@/layouts/dashboard.layout'
 import RootLayout from '@/layouts/root.layout'
 import {
+  DemoPage,
   ModelDetailPage,
   ModelsPage,
   NewCheckPage,
@@ -26,6 +27,8 @@ export const router = createBrowserRouter([
       // Clerk's components own their sub-routes (verification steps etc.), hence the splats
       { path: '/sign-in/*', element: <SignInPage /> },
       { path: '/sign-up/*', element: <SignUpPage /> },
+      // Public sample report, no sign-in
+      { path: '/demo', element: <DemoPage /> },
       {
         path: '/',
         element: <DashboardLayout />,
