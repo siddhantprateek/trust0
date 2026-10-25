@@ -20,7 +20,7 @@
       ]
     },
     {
-      "source": "/(logo-.*|og-image.jpg)",
+      "source": "/(logo-.*|og-image.webp)",
       "headers": [
         {
           "key": "Cache-Control",
