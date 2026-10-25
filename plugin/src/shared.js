@@ -18,7 +18,7 @@
   // The trust0 backend (src/). Change it here for a deployed API, and add that host to the manifest if it
   // isn't already covered by host_permissions.
   // Currently a Cloudflare quick tunnel to the local backend: the URL changes every time the tunnel restarts
-  const API_BASE = 'https://require-seminars-tires-holders.trycloudflare.com'
+  const API_BASE = 'https://limitation-wait-proposal-wayne.trycloudflare.com'
   // The studio (studio/), linked from the popup's settings
   const STUDIO_URL = 'https://studio.trytrust0.online'
 

@@ -82,9 +82,8 @@ function ExtensionMenu() {
           </button>
           <a
             role="menuitem"
-            href={site.githubUrl}
-            target="_blank"
-            rel="noreferrer"
+            href={site.extensionDownloadUrl}
+            download
             onClick={() => setOpen(false)}
             className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-neutral-100"
           >

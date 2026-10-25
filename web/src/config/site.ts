@@ -5,6 +5,7 @@ export const site = {
   tagline: 'The trust layer for everything you see online.',
   studioUrl: 'https://studio.trytrust0.online/',
   githubUrl: 'https://github.com/siddhantprateek/trust0',
+  extensionDownloadUrl: 'https://github.com/siddhantprateek/trust0/releases/download/v1.0.1/trust0-extension-0.1.0.zip',
   url: 'https://trytrust0.online',
   legalName: '[Company legal name]',
   address: '[Registered business address]',
