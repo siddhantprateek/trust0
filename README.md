@@ -2,6 +2,8 @@
 
 ### The trust layer for everything you see online.
 
+![](./docs/trust0-thumbnail.png)
+
 [Open the studio](https://studio.trytrust0.online/) · [GitHub](https://github.com/siddhantprateek/trust0)
 
 AI-generated images, recycled videos and confident-sounding AI answers spread faster than anyone can check them. **trust0 tells you if something can be trusted, where it came from, and why.**
