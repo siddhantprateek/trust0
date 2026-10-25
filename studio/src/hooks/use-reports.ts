@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { sampleReport } from '@/data/sample-report'
 import { api } from '@/lib/api'
 import type { Report } from '@/lib/types'
 
@@ -45,13 +46,17 @@ function usePolled<T>(
   return state
 }
 
+// The bundled sample report is always listed and opens without the API, so the studio has something to show
+// even before a backend is connected
 export function useReports() {
-  return usePolled<Report[]>(api.listReports, (reports) => reports.some((r) => r.status === 'analyzing'), [], 'list', LIST_POLL_MS)
+  const state = usePolled<Report[]>(api.listReports, (reports) => reports.some((r) => r.status === 'analyzing'), [], 'list', LIST_POLL_MS)
+  const data = state.data.some((r) => r.id === sampleReport.id) ? state.data : [...state.data, sampleReport]
+  return { ...state, data }
 }
 
 export function useReport(id: string | undefined) {
   return usePolled<Report | null>(
-    () => (id ? api.getReport(id) : Promise.resolve(null)),
+    () => (id === sampleReport.id ? Promise.resolve(sampleReport) : id ? api.getReport(id) : Promise.resolve(null)),
     (report) => report?.status === 'analyzing',
     null,
     id ?? '',
